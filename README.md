@@ -19,13 +19,12 @@ This project was built entirely with **Antigravity**, a powerful agentic AI codi
 * **Unified Leaderboard (Single Log)**: Ranks all 48 teams in one table.
   * *Tournament Rank (Official)*: Groups teams by their group position (all 1st-place teams 1-12, all 2nd-place teams 13-24, all 3rd-place teams 25-36, all 4th-place teams 37-48) sorted globally.
   * *Pure Global Sort*: A pure points leaderboard sorting all 48 teams globally from 1 to 48.
+* **Normal View (Group View)**: Displays the traditional 12 separate 4-team tables (Group A to L) side-by-side in a responsive grid, with live-updated positions and qualifying highlighting.
 * **Dynamic Qualification Solver**:
   * Automatically calculates group ranks based on PTS $\rightarrow$ Goal Difference $\rightarrow$ Goals For $\rightarrow$ Wins.
   * Automatically highlights direct qualifiers (Top 2) and resolves the 8 best third-place wildcard spots.
-  * Stands scale dynamically: positions display as "Live" until the group matches finish (every team plays 3 games), preventing premature qualification statistics.
-* **Resilient Data Layer**:
-  * **Primary**: Fetches from API-Football for live results.
-  * **Fallback**: If the API key is restricted to previous seasons (e.g. on Free plans), it automatically switches to fetch live-updated JSON feeds from the OpenFootball community dataset, ensuring the app works out of the box.
+  * Standings scale dynamically: positions display as "Live" until the group matches finish (every team plays 3 games), preventing premature qualification statistics.
+* **Live Data Stream**: Fetches directly from the live-updated JSON feeds of the OpenFootball community dataset, ensuring the app works out of the box without requiring API keys or subscriptions.
 * **Windows Flag Rendering Fix**: Employs real PNG flag images via FlagCDN instead of unicode emojis (which often render as simple two-letter text codes on Windows browsers).
 * **Premium Theme**: Dark glassmorphic panels with gold/emerald glowing indicators.
 
