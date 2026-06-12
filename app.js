@@ -1,7 +1,5 @@
 // App State & Data Definitions
 
-const API_KEY = 'c7bec1aaf977d7760a81c0371309f6b8';
-const APISPORTS_URL = 'https://v3.football.api-sports.io';
 const OPENFOOTBALL_URL = 'https://raw.githubusercontent.com/openfootball/worldcup.json/master/2026/worldcup.json';
 
 // Official 48 Teams, Groups & Flags
@@ -153,48 +151,19 @@ function normalizeTeamName(name) {
 // ----------------------------------------------------
 
 async function fetchTournamentData() {
-  updateApiStatus('warning', 'Connecting to API-Football...');
+  updateApiStatus('warning', 'Connecting to Live Feed...');
   
   try {
-    // Attempt fetching standings directly from API-Football
-    const response = await fetch(`${APISPORTS_URL}/standings?league=1&season=2026`, {
-      method: 'GET',
-      headers: {
-        'x-apisports-key': API_KEY
-      }
-    });
-    
+    const response = await fetch(OPENFOOTBALL_URL);
+    if (!response.ok) throw new Error(`HTTP Error ${response.status}`);
     const data = await response.json();
     
-    // Check if API-Football returned a plan restriction error
-    if (data.errors && data.errors.plan) {
-      console.warn('API-Football restriction:', data.errors.plan);
-      throw new Error(`Plan restriction: ${data.errors.plan}`);
-    }
-    
-    if (data.response && data.response.length > 0) {
-      updateApiStatus('success', 'Connected to Live API-Football Feed');
-      processApiFootballData(data.response[0].league.standings);
-      return;
-    }
-    
-    throw new Error('No standing response from API-Football');
-  } catch (apiSportsErr) {
-    console.log('API-Football failed or restricted. Falling back to OpenFootball JSON Database...', apiSportsErr);
-    updateApiStatus('warning', 'API restricted. Connecting to OpenFootball Mirror...');
-    
-    try {
-      const response = await fetch(OPENFOOTBALL_URL);
-      if (!response.ok) throw new Error(`HTTP Error ${response.status}`);
-      const data = await response.json();
-      
-      updateApiStatus('success', 'Connected to OpenFootball Data Feed');
-      processOpenFootballData(data.matches);
-    } catch (openFootballErr) {
-      console.error('All data sources failed:', openFootballErr);
-      updateApiStatus('error', 'All Data Sources Offline');
-      showErrorState();
-    }
+    updateApiStatus('success', 'Connected to Live Feed');
+    processOpenFootballData(data.matches);
+  } catch (err) {
+    console.error('All data sources failed:', err);
+    updateApiStatus('error', 'Data Source Offline');
+    showErrorState();
   }
 }
 
@@ -205,67 +174,6 @@ function updateApiStatus(type, text) {
   
   dot.className = `status-dot ${type}`;
   label.textContent = text;
-}
-
-// ----------------------------------------------------
-// Data Processing: API-Football (Standings returned directly)
-// ----------------------------------------------------
-function processApiFootballData(apiGroups) {
-  // Clear and rebuild teams stats map
-  const teamStats = {};
-  for (let team in TEAMS_DATA) {
-    teamStats[team] = createEmptyStatObject(team);
-  }
-  
-  // API Football returns group array of arrays
-  apiGroups.forEach(groupList => {
-    groupList.forEach(item => {
-      const normalizedName = normalizeTeamName(item.team.name);
-      if (teamStats[normalizedName]) {
-        teamStats[normalizedName].mp = item.all.played || 0;
-        teamStats[normalizedName].w = item.all.win || 0;
-        teamStats[normalizedName].d = item.all.draw || 0;
-        teamStats[normalizedName].l = item.all.lose || 0;
-        teamStats[normalizedName].gf = item.all.goals.for || 0;
-        teamStats[normalizedName].ga = item.all.goals.against || 0;
-        teamStats[normalizedName].gd = item.goalsDiff !== undefined ? item.goalsDiff : (item.all.goals.for - item.all.goals.against);
-        teamStats[normalizedName].pts = item.points || 0;
-      }
-    });
-  });
-  
-  // Calculate standings from teams
-  computeStandingsFromStats(teamStats);
-  
-  // Also try to fetch matches for schedule sidebar from API-Football
-  fetchMatchesFromApiFootball();
-}
-
-async function fetchMatchesFromApiFootball() {
-  try {
-    const res = await fetch(`${APISPORTS_URL}/fixtures?league=1&season=2026`, {
-      headers: { 'x-apisports-key': API_KEY }
-    });
-    const data = await res.json();
-    if (data.response && data.response.length > 0) {
-      matches = data.response.map(item => {
-        return {
-          round: item.league.round.replace('Group Stage - ', 'Matchday '),
-          date: item.fixture.date.split('T')[0],
-          time: new Date(item.fixture.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          team1: normalizeTeamName(item.teams.home.name),
-          team2: normalizeTeamName(item.teams.away.name),
-          score: item.goals.home !== null ? { ft: [item.goals.home, item.goals.away] } : null,
-          group: TEAMS_DATA[normalizeTeamName(item.teams.home.name)]?.group ? `Group ${TEAMS_DATA[normalizeTeamName(item.teams.home.name)].group}` : '',
-          ground: item.fixture.venue.city
-        };
-      });
-      renderMatches();
-      renderStats();
-    }
-  } catch (err) {
-    console.warn('Could not fetch matches from API-Football:', err);
-  }
 }
 
 // ----------------------------------------------------
@@ -455,6 +363,7 @@ function computeStandingsFromStats(teamStats) {
   };
   
   renderStandings();
+  renderNormalView();
 }
 
 // Strict global sort helper
@@ -670,11 +579,99 @@ function showErrorState() {
   matchesList.innerHTML = `<div class="matches-loading" style="color: var(--eliminated);">Offline: Could not load fixtures.</div>`;
 }
 
+function renderNormalView() {
+  const container = document.getElementById('groupsGridContainer');
+  container.innerHTML = '';
+  
+  const groups = {};
+  standings.rank.forEach(team => {
+    if (!groups[team.group]) groups[team.group] = [];
+    groups[team.group].push(team);
+  });
+  
+  const alphabet = 'ABCDEFGHIJKL'.split('');
+  alphabet.forEach(letter => {
+    const groupTeams = groups[letter] || [];
+    groupTeams.sort((a, b) => a.groupPos - b.groupPos);
+    
+    const card = document.createElement('div');
+    card.className = 'group-card';
+    
+    let tableRows = '';
+    groupTeams.forEach(team => {
+      let rowClass = '';
+      if (team.status === 'qualified-direct') rowClass = 'mini-q-direct';
+      else if (team.status === 'qualified-wildcard') rowClass = 'mini-q-wildcard';
+      else if (team.status === 'eliminated') rowClass = 'mini-eliminated';
+      
+      tableRows += `
+        <tr class="${rowClass}">
+          <td class="mini-col-rank">${team.groupPos}</td>
+          <td class="mini-col-team">
+            <img class="team-flag" src="${team.flag}" alt="${team.name} flag" width="18" height="12">
+            <span class="team-name">${team.name}</span>
+          </td>
+          <td class="mini-col-num">${team.mp}</td>
+          <td class="mini-col-num">${team.gd > 0 ? '+' + team.gd : team.gd}</td>
+          <td class="mini-col-pts">${team.pts}</td>
+        </tr>
+      `;
+    });
+    
+    card.innerHTML = `
+      <div class="group-card-header">Group ${letter}</div>
+      <table class="mini-standings-table">
+        <thead>
+          <tr>
+            <th class="mini-col-rank">#</th>
+            <th class="mini-col-team">Team</th>
+            <th class="mini-col-num">MP</th>
+            <th class="mini-col-num">GD</th>
+            <th class="mini-col-pts">PTS</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${tableRows}
+        </tbody>
+      </table>
+    `;
+    container.appendChild(card);
+  });
+}
+
 // ----------------------------------------------------
 // UI Control Listeners
 // ----------------------------------------------------
 
 function setupUIEventListeners() {
+  // Tab Switching
+  const btnTabUnified = document.getElementById('btnTabUnified');
+  const btnTabNormal = document.getElementById('btnTabNormal');
+  const unifiedTableWrapper = document.getElementById('unifiedTableWrapper');
+  const groupsGridContainer = document.getElementById('groupsGridContainer');
+  const sortToggleContainer = document.getElementById('sortToggleContainer');
+  const filtersBar = document.getElementById('filtersBar');
+  
+  btnTabUnified.addEventListener('click', () => {
+    btnTabUnified.classList.add('active');
+    btnTabNormal.classList.remove('active');
+    
+    unifiedTableWrapper.style.display = 'block';
+    filtersBar.style.display = 'block';
+    sortToggleContainer.style.display = 'flex';
+    groupsGridContainer.style.display = 'none';
+  });
+  
+  btnTabNormal.addEventListener('click', () => {
+    btnTabNormal.classList.add('active');
+    btnTabUnified.classList.remove('active');
+    
+    unifiedTableWrapper.style.display = 'none';
+    filtersBar.style.display = 'none';
+    sortToggleContainer.style.display = 'none';
+    groupsGridContainer.style.display = 'grid';
+  });
+
   // Sort view toggles
   const btnRank = document.getElementById('btnSortRank');
   const btnPure = document.getElementById('btnSortPure');

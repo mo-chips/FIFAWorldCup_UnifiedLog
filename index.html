@@ -54,8 +54,11 @@
       <!-- Left Column: Standings -->
       <section class="section-standings">
         <div class="card-header-actions">
-          <h2>Unified Leaderboard</h2>
-          <div class="toggle-container">
+          <div class="view-tabs">
+            <button class="btn-tab active" id="btnTabUnified" title="Show the combined single log standings of all 48 teams">Unified Log</button>
+            <button class="btn-tab" id="btnTabNormal" title="Show the traditional 12 group tables side-by-side">Normal View</button>
+          </div>
+          <div class="toggle-container" id="sortToggleContainer">
             <span class="toggle-label">Sort View:</span>
             <div class="toggle-buttons">
               <button class="btn-toggle active" id="btnSortRank" title="Sort by official tournament rank (1st place teams, then 2nd place, then 3rd, then 4th)">Tournament Rank</button>
@@ -65,7 +68,7 @@
         </div>
 
         <!-- Filters Bar -->
-        <div class="filters-bar">
+        <div class="filters-bar" id="filtersBar">
           <div class="search-box">
             <span class="search-icon">🔍</span>
             <input type="text" id="teamSearch" placeholder="Search teams...">
@@ -85,7 +88,7 @@
         </div>
 
         <!-- Table Container -->
-        <div class="table-scroll-container">
+        <div class="table-scroll-container" id="unifiedTableWrapper">
           <table class="standings-table" id="standingsTable">
             <thead>
               <tr>
@@ -109,6 +112,11 @@
               </tr>
             </tbody>
           </table>
+        </div>
+
+        <!-- Groups Grid Container (Normal View) -->
+        <div class="groups-grid-container" id="groupsGridContainer" style="display: none;">
+          <!-- Dynamically populated group tables -->
         </div>
 
         <!-- Legend -->
