@@ -364,6 +364,7 @@ function computeStandingsFromStats(teamStats) {
   
   renderStandings();
   renderNormalView();
+  renderTournamentStats(thirdPlaceTeams, allTeams);
 }
 
 // Strict global sort helper
@@ -639,6 +640,186 @@ function renderNormalView() {
   });
 }
 
+function renderTournamentStats(thirdPlaceTeams, allTeams) {
+  const sidebar = document.getElementById('tournamentStatsSidebar');
+  if (!sidebar) return;
+  
+  // 1. Render Wildcard Tracker (3rd Place Standings)
+  let wildcardRows = '';
+  thirdPlaceTeams.forEach((team, idx) => {
+    let rowClass = '';
+    
+    if (team.status === 'qualified-wildcard') {
+      rowClass = 'row-q-wildcard';
+    } else if (team.status === 'eliminated') {
+      rowClass = 'row-eliminated';
+    } else {
+      if (idx < 8) {
+        rowClass = 'row-q-wildcard';
+      }
+    }
+    
+    wildcardRows += `
+      <tr class="${rowClass}">
+        <td>${idx + 1}</td>
+        <td>
+          <div class="team-badge-cell">
+            <img class="team-flag" src="${team.flag}" alt="${team.name} flag" width="18" height="12">
+            <span>${team.name}</span>
+          </div>
+        </td>
+        <td style="text-align: center;">${team.group}</td>
+        <td style="text-align: center;">${team.gd > 0 ? '+' + team.gd : team.gd}</td>
+        <td style="text-align: center; font-weight: 700;">${team.pts}</td>
+      </tr>
+    `;
+  });
+  
+  const wildcardSection = `
+    <div class="stats-section-card">
+      <div class="stats-section-title">Wildcard Tracker (3rd Place)</div>
+      <table class="sidebar-table">
+        <thead>
+          <tr>
+            <th style="width: 30px;">#</th>
+            <th>Team</th>
+            <th style="text-align: center; width: 40px;">Grp</th>
+            <th style="text-align: center; width: 40px;">GD</th>
+            <th style="text-align: center; width: 40px;">PTS</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${wildcardRows}
+        </tbody>
+      </table>
+    </div>
+  `;
+  
+  // 2. Render Tournament Leaders
+  const topAttacks = [...allTeams]
+    .sort((a, b) => b.gf - a.gf || a.name.localeCompare(b.name))
+    .slice(0, 3);
+    
+  const bestDefenses = [...allTeams]
+    .filter(t => t.mp > 0)
+    .sort((a, b) => a.ga - b.ga || b.mp - a.mp || a.name.localeCompare(b.name))
+    .slice(0, 3);
+    
+  let attackHTML = '';
+  topAttacks.forEach((team, idx) => {
+    const icon = idx === 0 ? '🏆' : idx === 1 ? '🥈' : '🥉';
+    attackHTML += `
+      <div class="leader-team-item">
+        <div class="leader-team-info">
+          <span>${icon}</span>
+          <img class="team-flag" src="${team.flag}" alt="${team.name} flag" width="18" height="12">
+          <span>${team.name}</span>
+        </div>
+        <span class="leader-value">${team.gf} GF</span>
+      </div>
+    `;
+  });
+  if (topAttacks.length === 0) {
+    attackHTML = `<div style="font-size: 0.8rem; color: var(--text-muted);">No goals scored yet.</div>`;
+  }
+  
+  let defenseHTML = '';
+  bestDefenses.forEach((team, idx) => {
+    const icon = idx === 0 ? '🏆' : idx === 1 ? '🥈' : '🥉';
+    defenseHTML += `
+      <div class="leader-team-item">
+        <div class="leader-team-info">
+          <span>${icon}</span>
+          <img class="team-flag" src="${team.flag}" alt="${team.name} flag" width="18" height="12">
+          <span>${team.name}</span>
+        </div>
+        <span class="leader-value">${team.ga} GA (${team.mp} MP)</span>
+      </div>
+    `;
+  });
+  if (bestDefenses.length === 0) {
+    defenseHTML = `<div style="font-size: 0.8rem; color: var(--text-muted);">No matches played yet.</div>`;
+  }
+  
+  const leadersSection = `
+    <div class="stats-section-card">
+      <div class="stats-section-title">Tournament Leaders</div>
+      <div class="leaders-container">
+        <div class="leader-row">
+          <span class="leader-label">🔥 Top Attacks (Goals For)</span>
+          <div class="leader-teams">
+            ${attackHTML}
+          </div>
+        </div>
+        <div class="leader-row">
+          <span class="leader-label">🛡️ Best Defenses (Goals Against)</span>
+          <div class="leader-teams">
+            ${defenseHTML}
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  // 3. Render Highest Scoring Groups
+  const groupStats = {};
+  const alphabet = 'ABCDEFGHIJKL'.split('');
+  alphabet.forEach(letter => {
+    groupStats[letter] = { goals: 0, mp: 0 };
+  });
+  
+  matches.forEach(m => {
+    if (m.score && m.score.ft) {
+      const teamData = TEAMS_DATA[m.team1];
+      const letter = teamData ? teamData.group : null;
+      if (letter && groupStats[letter]) {
+        groupStats[letter].goals += m.score.ft[0] + m.score.ft[1];
+        groupStats[letter].mp += 1;
+      }
+    }
+  });
+  
+  const sortedGroups = alphabet.map(letter => ({
+    group: letter,
+    goals: groupStats[letter].goals,
+    mp: groupStats[letter].mp,
+    avg: groupStats[letter].mp > 0 ? (groupStats[letter].goals / groupStats[letter].mp).toFixed(2) : '0.00'
+  })).sort((a, b) => b.goals - a.goals || b.avg - a.avg || a.group.localeCompare(b.group));
+  
+  let groupRows = '';
+  sortedGroups.slice(0, 5).forEach((g, idx) => {
+    groupRows += `
+      <tr>
+        <td>${idx + 1}</td>
+        <td style="font-weight: 600;">Group ${g.group}</td>
+        <td style="text-align: center;">${g.goals}</td>
+        <td style="text-align: center; color: var(--text-secondary);">${g.avg}</td>
+      </tr>
+    `;
+  });
+  
+  const groupsSection = `
+    <div class="stats-section-card">
+      <div class="stats-section-title">Highest Scoring Groups</div>
+      <table class="sidebar-table">
+        <thead>
+          <tr>
+            <th style="width: 30px;">#</th>
+            <th>Group</th>
+            <th style="text-align: center; width: 60px;">Goals</th>
+            <th style="text-align: center; width: 80px;">Avg/Match</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${groupRows}
+        </tbody>
+      </table>
+    </div>
+  `;
+  
+  sidebar.innerHTML = wildcardSection + leadersSection + groupsSection;
+}
+
 // ----------------------------------------------------
 // UI Control Listeners
 // ----------------------------------------------------
@@ -648,7 +829,7 @@ function setupUIEventListeners() {
   const btnTabUnified = document.getElementById('btnTabUnified');
   const btnTabNormal = document.getElementById('btnTabNormal');
   const unifiedTableWrapper = document.getElementById('unifiedTableWrapper');
-  const groupsGridContainer = document.getElementById('groupsGridContainer');
+  const normalViewLayout = document.getElementById('normalViewLayout');
   const sortToggleContainer = document.getElementById('sortToggleContainer');
   const filtersBar = document.getElementById('filtersBar');
   
@@ -659,7 +840,7 @@ function setupUIEventListeners() {
     unifiedTableWrapper.style.display = 'block';
     filtersBar.style.display = 'block';
     sortToggleContainer.style.display = 'flex';
-    groupsGridContainer.style.display = 'none';
+    normalViewLayout.style.display = 'none';
   });
   
   btnTabNormal.addEventListener('click', () => {
@@ -669,7 +850,7 @@ function setupUIEventListeners() {
     unifiedTableWrapper.style.display = 'none';
     filtersBar.style.display = 'none';
     sortToggleContainer.style.display = 'none';
-    groupsGridContainer.style.display = 'grid';
+    normalViewLayout.style.display = 'flex';
   });
 
   // Sort view toggles

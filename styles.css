@@ -297,6 +297,7 @@ h2 {
   border-radius: 12px;
   padding: 16px;
   border: 1px solid rgba(255, 255, 255, 0.02);
+  margin-bottom: 20px;
 }
 
 .search-box {
@@ -967,5 +968,196 @@ h2 {
   font-weight: 700;
   color: #fff;
   background: rgba(255, 255, 255, 0.01);
+}
+
+/* Normal View Layout with Sidebar next to it */
+.normal-view-layout {
+  display: flex;
+  gap: 24px;
+  align-items: start;
+  width: 100%;
+}
+
+.normal-view-layout .groups-grid-container {
+  flex: 1;
+  margin-top: 0;
+}
+
+/* Tournament Stats Sidebar Styling */
+.tournament-stats-sidebar {
+  width: 340px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.stats-section-card {
+  background: rgba(0, 0, 0, 0.18);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: var(--shadow-lg);
+  transition: var(--transition);
+}
+
+.stats-section-card:hover {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.stats-section-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 12px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-color);
+  background: linear-gradient(135deg, #fff 40%, var(--accent-gold) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Sidebar Table Styling */
+.sidebar-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.sidebar-table th {
+  color: var(--text-muted);
+  font-weight: 600;
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border-color);
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.5px;
+}
+
+.sidebar-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  color: var(--text-primary);
+}
+
+.sidebar-table tr:last-child td {
+  border-bottom: none;
+}
+
+.sidebar-table tr.row-q-direct {
+  background: rgba(16, 185, 129, 0.04);
+}
+.sidebar-table tr.row-q-direct td:first-child {
+  border-left: 3px solid var(--qualify-direct);
+}
+
+.sidebar-table tr.row-q-wildcard {
+  background: rgba(14, 165, 233, 0.04);
+}
+.sidebar-table tr.row-q-wildcard td:first-child {
+  border-left: 3px solid var(--qualify-wildcard);
+}
+
+.sidebar-table tr.row-eliminated {
+  background: rgba(244, 63, 94, 0.03);
+  opacity: 0.7;
+}
+.sidebar-table tr.row-eliminated td:first-child {
+  border-left: 3px solid var(--eliminated);
+}
+
+/* Leaders Styling */
+.leaders-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.leader-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.02);
+}
+
+.leader-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.leader-teams {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.leader-team-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.leader-team-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.leader-value {
+  font-weight: 700;
+  color: var(--accent-gold);
+}
+
+/* Responsiveness adjustments for Normal View Layout */
+@media (max-width: 1200px) {
+  .normal-view-layout {
+    flex-direction: column;
+  }
+  
+  .tournament-stats-sidebar {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+  }
+}
+
+@media (max-width: 680px) {
+  .tournament-stats-sidebar {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Responsive Standings Table tweaks */
+@media (max-width: 600px) {
+  .standings-table th:nth-child(5), /* W */
+  .standings-table td:nth-child(5),
+  .standings-table th:nth-child(6), /* D */
+  .standings-table td:nth-child(6),
+  .standings-table th:nth-child(7), /* L */
+  .standings-table td:nth-child(7),
+  .standings-table th:nth-child(8), /* GF */
+  .standings-table td:nth-child(8),
+  .standings-table th:nth-child(9), /* GA */
+  .standings-table td:nth-child(9) {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .standings-table th.col-status,
+  .standings-table td.col-status {
+    display: none;
+  }
 }
 

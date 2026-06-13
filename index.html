@@ -114,9 +114,15 @@
           </table>
         </div>
 
-        <!-- Groups Grid Container (Normal View) -->
-        <div class="groups-grid-container" id="groupsGridContainer" style="display: none;">
-          <!-- Dynamically populated group tables -->
+        <!-- Normal View Layout Container -->
+        <div class="normal-view-layout" id="normalViewLayout" style="display: none;">
+          <div class="groups-grid-container" id="groupsGridContainer">
+            <!-- Dynamically populated group tables -->
+          </div>
+
+          <aside class="tournament-stats-sidebar" id="tournamentStatsSidebar">
+            <!-- Dynamically populated stats -->
+          </aside>
         </div>
 
         <!-- Legend -->
@@ -153,6 +159,6 @@
     </footer>
   </div>
 
-  <script src="app.js"></script>
+  <script type="module" src="app.js"></script>
 </body>
 </html>
