@@ -20,10 +20,16 @@ This project was built entirely with **Antigravity**, a powerful agentic AI codi
   * *Tournament Rank (Official)*: Groups teams by their group position (all 1st-place teams 1-12, all 2nd-place teams 13-24, all 3rd-place teams 25-36, all 4th-place teams 37-48) sorted globally.
   * *Pure Global Sort*: A pure points leaderboard sorting all 48 teams globally from 1 to 48.
 * **Normal View (Group View)**: Displays the traditional 12 separate 4-team tables (Group A to L) side-by-side in a responsive grid, with live-updated positions and qualifying highlighting.
+* **Tournament Stats Sidebar (Normal View)**:
+  * *Third-Place Wildcard Tracker*: Ranks the 12 third-place teams dynamically, highlighting who qualifies.
+  * *Tournament Leaders*: Displays top attacking and best defensive teams, alongside worst attacks (fewest GF) and worst defenses (most GA) once they've played.
+  * *Top Goalscorers*: Lists the tournament's leading goal scorers based on real match data.
+  * *Highest Scoring Groups*: Tracks group excitement by total goals and goals-per-match averages.
 * **Dynamic Qualification Solver**:
   * Automatically calculates group ranks based on PTS $\rightarrow$ Goal Difference $\rightarrow$ Goals For $\rightarrow$ Wins.
   * Automatically highlights direct qualifiers (Top 2) and resolves the 8 best third-place wildcard spots.
   * Standings scale dynamically: positions display as "Live" until the group matches finish (every team plays 3 games), preventing premature qualification statistics.
+* **Optimized Local Storage Cache**: Implements a 5-minute client-side cache for matches data, providing instant page load times and reducing network traffic to GitHub.
 * **Live Data Stream**: Fetches directly from the live-updated JSON feeds of the OpenFootball community dataset, ensuring the app works out of the box without requiring API keys or subscriptions.
 * **Windows Flag Rendering Fix**: Employs real PNG flag images via FlagCDN instead of unicode emojis (which often render as simple two-letter text codes on Windows browsers).
 * **Premium Theme**: Dark glassmorphic panels with gold/emerald glowing indicators.

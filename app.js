@@ -124,6 +124,7 @@ let standings = [];
 let sortMode = 'rank'; // 'rank' or 'pure'
 let currentFilter = 'all'; // 'all', 'qualified', 'third-place', 'eliminated', or Group letter 'A'-'L'
 let searchQuery = '';
+let topGoalscorers = [];
 
 // Normalizes name from APIs to match TEAMS_DATA keys
 function normalizeTeamName(name) {
@@ -151,6 +152,25 @@ function normalizeTeamName(name) {
 // ----------------------------------------------------
 
 async function fetchTournamentData() {
+  const CACHE_KEY = 'fifa_2026_matches_data';
+  const CACHE_TIME_KEY = 'fifa_2026_matches_cache_time';
+  const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes in ms
+  
+  const now = Date.now();
+  const cachedData = localStorage.getItem(CACHE_KEY);
+  const cachedTime = localStorage.getItem(CACHE_TIME_KEY);
+  
+  if (cachedData && cachedTime && (now - parseInt(cachedTime)) < CACHE_DURATION) {
+    try {
+      const data = JSON.parse(cachedData);
+      updateApiStatus('success', 'Connected to Live Feed (Cached)');
+      processOpenFootballData(data.matches);
+      return;
+    } catch (e) {
+      console.warn('Error parsing cached data, fetching fresh data...', e);
+    }
+  }
+  
   updateApiStatus('warning', 'Connecting to Live Feed...');
   
   try {
@@ -158,10 +178,25 @@ async function fetchTournamentData() {
     if (!response.ok) throw new Error(`HTTP Error ${response.status}`);
     const data = await response.json();
     
+    // Save to cache
+    localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+    localStorage.setItem(CACHE_TIME_KEY, now.toString());
+    
     updateApiStatus('success', 'Connected to Live Feed');
     processOpenFootballData(data.matches);
   } catch (err) {
     console.error('All data sources failed:', err);
+    
+    // Fallback to expired cache if offline
+    if (cachedData) {
+      try {
+        const data = JSON.parse(cachedData);
+        updateApiStatus('warning', 'Offline - Using Stale Cached Data');
+        processOpenFootballData(data.matches);
+        return;
+      } catch (e) {}
+    }
+    
     updateApiStatus('error', 'Data Source Offline');
     showErrorState();
   }
@@ -202,6 +237,8 @@ function calculateStandingsFromMatches() {
     teamStats[team] = createEmptyStatObject(team);
   }
   
+  const playerGoalsMap = {};
+  
   // Accumulate standings based on match scores
   matches.forEach(match => {
     const t1 = match.team1;
@@ -236,7 +273,32 @@ function calculateStandingsFromMatches() {
     
     teamStats[t1].gd = teamStats[t1].gf - teamStats[t1].ga;
     teamStats[t2].gd = teamStats[t2].gf - teamStats[t2].ga;
+    
+    // Accumulate player goals (real data from JSON goals list)
+    if (match.goals1) {
+      match.goals1.forEach(g => {
+        if (g.owngoal) return; // Skip own goals for top scorers
+        const scorerName = g.name;
+        if (!playerGoalsMap[scorerName]) {
+          playerGoalsMap[scorerName] = { name: scorerName, team: t1, goals: 0 };
+        }
+        playerGoalsMap[scorerName].goals += 1;
+      });
+    }
+    if (match.goals2) {
+      match.goals2.forEach(g => {
+        if (g.owngoal) return; // Skip own goals for top scorers
+        const scorerName = g.name;
+        if (!playerGoalsMap[scorerName]) {
+          playerGoalsMap[scorerName] = { name: scorerName, team: t2, goals: 0 };
+        }
+        playerGoalsMap[scorerName].goals += 1;
+      });
+    }
   });
+  
+  // Sort and assign to global topGoalscorers
+  topGoalscorers = Object.values(playerGoalsMap).sort((a, b) => b.goals - a.goals || a.name.localeCompare(b.name));
   
   computeStandingsFromStats(teamStats);
   renderMatches();
@@ -695,14 +757,24 @@ function renderTournamentStats(thirdPlaceTeams, allTeams) {
     </div>
   `;
   
-  // 2. Render Tournament Leaders
+  // 2. Render Tournament Leaders (Top/Worst Attack and Top/Worst Defense)
   const topAttacks = [...allTeams]
     .sort((a, b) => b.gf - a.gf || a.name.localeCompare(b.name))
+    .slice(0, 3);
+    
+  const worstAttacks = [...allTeams]
+    .filter(t => t.mp > 0)
+    .sort((a, b) => a.gf - b.gf || b.mp - a.mp || a.name.localeCompare(b.name))
     .slice(0, 3);
     
   const bestDefenses = [...allTeams]
     .filter(t => t.mp > 0)
     .sort((a, b) => a.ga - b.ga || b.mp - a.mp || a.name.localeCompare(b.name))
+    .slice(0, 3);
+    
+  const worstDefenses = [...allTeams]
+    .filter(t => t.mp > 0)
+    .sort((a, b) => b.ga - a.ga || a.mp - b.mp || a.name.localeCompare(b.name))
     .slice(0, 3);
     
   let attackHTML = '';
@@ -723,6 +795,24 @@ function renderTournamentStats(thirdPlaceTeams, allTeams) {
     attackHTML = `<div style="font-size: 0.8rem; color: var(--text-muted);">No goals scored yet.</div>`;
   }
   
+  let worstAttackHTML = '';
+  worstAttacks.forEach((team, idx) => {
+    const icon = idx === 0 ? '⚠️' : idx === 1 ? '🔸' : '🔹';
+    worstAttackHTML += `
+      <div class="leader-team-item">
+        <div class="leader-team-info">
+          <span>${icon}</span>
+          <img class="team-flag" src="${team.flag}" alt="${team.name} flag" width="18" height="12">
+          <span>${team.name}</span>
+        </div>
+        <span class="leader-value" style="color: var(--eliminated);">${team.gf} GF (${team.mp} MP)</span>
+      </div>
+    `;
+  });
+  if (worstAttacks.length === 0) {
+    worstAttackHTML = `<div style="font-size: 0.8rem; color: var(--text-muted);">No matches played yet.</div>`;
+  }
+  
   let defenseHTML = '';
   bestDefenses.forEach((team, idx) => {
     const icon = idx === 0 ? '🏆' : idx === 1 ? '🥈' : '🥉';
@@ -741,6 +831,24 @@ function renderTournamentStats(thirdPlaceTeams, allTeams) {
     defenseHTML = `<div style="font-size: 0.8rem; color: var(--text-muted);">No matches played yet.</div>`;
   }
   
+  let worstDefenseHTML = '';
+  worstDefenses.forEach((team, idx) => {
+    const icon = idx === 0 ? '⚠️' : idx === 1 ? '🔸' : '🔹';
+    worstDefenseHTML += `
+      <div class="leader-team-item">
+        <div class="leader-team-info">
+          <span>${icon}</span>
+          <img class="team-flag" src="${team.flag}" alt="${team.name} flag" width="18" height="12">
+          <span>${team.name}</span>
+        </div>
+        <span class="leader-value" style="color: var(--eliminated);">${team.ga} GA (${team.mp} MP)</span>
+      </div>
+    `;
+  });
+  if (worstDefenses.length === 0) {
+    worstDefenseHTML = `<div style="font-size: 0.8rem; color: var(--text-muted);">No matches played yet.</div>`;
+  }
+  
   const leadersSection = `
     <div class="stats-section-card">
       <div class="stats-section-title">Tournament Leaders</div>
@@ -752,16 +860,69 @@ function renderTournamentStats(thirdPlaceTeams, allTeams) {
           </div>
         </div>
         <div class="leader-row">
+          <span class="leader-label">💨 Worst Attacks (Goals For)</span>
+          <div class="leader-teams">
+            ${worstAttackHTML}
+          </div>
+        </div>
+        <div class="leader-row">
           <span class="leader-label">🛡️ Best Defenses (Goals Against)</span>
           <div class="leader-teams">
             ${defenseHTML}
+          </div>
+        </div>
+        <div class="leader-row">
+          <span class="leader-label">🚨 Worst Defenses (Goals Against)</span>
+          <div class="leader-teams">
+            ${worstDefenseHTML}
           </div>
         </div>
       </div>
     </div>
   `;
   
-  // 3. Render Highest Scoring Groups
+  // 3. Render Top Goalscorers
+  let scorerRows = '';
+  topGoalscorers.slice(0, 5).forEach((player, idx) => {
+    const flagUrl = TEAM_FLAG_CODES[player.team] ? `https://flagcdn.com/w40/${TEAM_FLAG_CODES[player.team]}.png` : 'https://flagcdn.com/w40/un.png';
+    scorerRows += `
+      <tr>
+        <td>${idx + 1}</td>
+        <td>
+          <div style="font-weight: 600;">${player.name}</div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary); display: flex; align-items: center; gap: 4px; margin-top: 2px;">
+            <img class="team-flag" src="${flagUrl}" alt="${player.team} flag" width="14" height="9" style="border-radius: 1px;">
+            <span>${player.team}</span>
+          </div>
+        </td>
+        <td style="text-align: center; font-size: 1.05rem; font-weight: 700; color: var(--accent-gold);">${player.goals}</td>
+      </tr>
+    `;
+  });
+  
+  if (topGoalscorers.length === 0) {
+    scorerRows = `<tr><td colspan="3" style="text-align: center; color: var(--text-muted); padding: 12px;">No goals scored yet.</td></tr>`;
+  }
+  
+  const goalscorersSection = `
+    <div class="stats-section-card">
+      <div class="stats-section-title">Top Goalscorers</div>
+      <table class="sidebar-table">
+        <thead>
+          <tr>
+            <th style="width: 30px;">#</th>
+            <th>Player</th>
+            <th style="text-align: center; width: 60px;">Goals</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${scorerRows}
+        </tbody>
+      </table>
+    </div>
+  `;
+  
+  // 4. Render Highest Scoring Groups
   const groupStats = {};
   const alphabet = 'ABCDEFGHIJKL'.split('');
   alphabet.forEach(letter => {
@@ -817,7 +978,7 @@ function renderTournamentStats(thirdPlaceTeams, allTeams) {
     </div>
   `;
   
-  sidebar.innerHTML = wildcardSection + leadersSection + groupsSection;
+  sidebar.innerHTML = wildcardSection + leadersSection + goalscorersSection + groupsSection;
 }
 
 // ----------------------------------------------------
