@@ -147,6 +147,76 @@ function normalizeTeamName(name) {
   return name.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
 
+function getMatchLocalDate(dateStr, timeStr) {
+  if (!dateStr) return null;
+  
+  let hh = '00';
+  let mm = '00';
+  let offset = '+00:00';
+  
+  if (timeStr) {
+    let cleanTimeStr = timeStr.trim();
+    const timeMatch = cleanTimeStr.match(/^(\d{1,2}):(\d{2})/);
+    if (timeMatch) {
+      hh = timeMatch[1].padStart(2, '0');
+      mm = timeMatch[2];
+    }
+    
+    if (cleanTimeStr.includes('UTC')) {
+      const offsetMatch = cleanTimeStr.match(/UTC([+-]\d+)/);
+      if (offsetMatch) {
+        const offsetVal = parseInt(offsetMatch[1]);
+        const sign = offsetVal >= 0 ? '+' : '-';
+        const absVal = Math.abs(offsetVal).toString().padStart(2, '0');
+        offset = `${sign}${absVal}:00`;
+      }
+    }
+  }
+  
+  const isoStr = `${dateStr}T${hh}:${mm}:00${offset}`;
+  const d = new Date(isoStr);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function populateMatchdayDropdown() {
+  const select = document.getElementById('selectMatchday');
+  if (!select) return;
+  
+  const currentValue = select.value || 'all';
+  let maxPlayedMatchday = 0;
+  
+  matches.forEach(m => {
+    if (m.score && m.score.ft) {
+      const match = m.round.match(/Matchday\s+(\d+)/i);
+      if (match) {
+        const num = parseInt(match[1]);
+        if (num > maxPlayedMatchday) {
+          maxPlayedMatchday = num;
+        }
+      }
+    }
+  });
+  
+  if (maxPlayedMatchday === 0) {
+    maxPlayedMatchday = 1;
+  }
+  
+  const maxOption = maxPlayedMatchday + 2;
+  
+  let html = `<option value="all">All Matchdays</option>`;
+  for (let i = 1; i <= maxOption; i++) {
+    html += `<option value="Matchday ${i}">Matchday ${i}</option>`;
+  }
+  
+  select.innerHTML = html;
+  
+  if (Array.from(select.options).some(opt => opt.value === currentValue)) {
+    select.value = currentValue;
+  } else {
+    select.value = 'all';
+  }
+}
+
 // ----------------------------------------------------
 // Data Fetching
 // ----------------------------------------------------
@@ -306,6 +376,7 @@ function calculateStandingsFromMatches() {
   topGoalscorers = Object.values(playerGoalsMap).sort((a, b) => b.goals - a.goals || a.name.localeCompare(b.name));
   
   computeStandingsFromStats(teamStats);
+  populateMatchdayDropdown();
   renderMatches();
   renderStats();
 }
@@ -556,7 +627,8 @@ function renderMatches() {
   let currentGroupHeader = '';
   
   filteredMatches.forEach(m => {
-    const formattedDate = new Date(m.date + 'T00:00:00').toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+    const localDate = getMatchLocalDate(m.date, m.time) || new Date(m.date + 'T00:00:00');
+    const formattedDate = localDate.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
     const headerText = `${m.round} - ${formattedDate}`;
     
     if (headerText !== currentGroupHeader) {
@@ -589,10 +661,12 @@ function renderMatches() {
       `;
     }
     
+    const localTimeStr = m.time ? (getMatchLocalDate(m.date, m.time) ? getMatchLocalDate(m.date, m.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) + ' Local' : m.time) : '';
+    
     card.innerHTML = `
       <div class="match-meta">
         <span class="match-group-tag">${m.group || 'Group Stage'}</span>
-        <span class="match-time">${m.time || ''}</span>
+        <span class="match-time">${localTimeStr}</span>
       </div>
       <div class="match-score-row">
         <div class="match-team team-left">
