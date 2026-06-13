@@ -151,7 +151,7 @@ function normalizeTeamName(name) {
 // Data Fetching
 // ----------------------------------------------------
 
-async function fetchTournamentData() {
+async function fetchTournamentData(force = false) {
   const CACHE_KEY = 'fifa_2026_matches_data';
   const CACHE_TIME_KEY = 'fifa_2026_matches_cache_time';
   const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes in ms
@@ -160,7 +160,7 @@ async function fetchTournamentData() {
   const cachedData = localStorage.getItem(CACHE_KEY);
   const cachedTime = localStorage.getItem(CACHE_TIME_KEY);
   
-  if (cachedData && cachedTime && (now - parseInt(cachedTime)) < CACHE_DURATION) {
+  if (!force && cachedData && cachedTime && (now - parseInt(cachedTime)) < CACHE_DURATION) {
     try {
       const data = JSON.parse(cachedData);
       updateApiStatus('success', 'Connected to Live Feed (Cached)');
@@ -174,7 +174,10 @@ async function fetchTournamentData() {
   updateApiStatus('warning', 'Connecting to Live Feed...');
   
   try {
-    const response = await fetch(OPENFOOTBALL_URL);
+    const url = force ? `${OPENFOOTBALL_URL}?t=${now}` : OPENFOOTBALL_URL;
+    const fetchOptions = force ? { cache: 'no-cache' } : {};
+    
+    const response = await fetch(url, fetchOptions);
     if (!response.ok) throw new Error(`HTTP Error ${response.status}`);
     const data = await response.json();
     
@@ -224,7 +227,9 @@ function processOpenFootballData(openMatches) {
       team2: normalizeTeamName(m.team2),
       score: m.score && m.score.ft ? { ft: m.score.ft } : null,
       group: m.group,
-      ground: m.ground
+      ground: m.ground,
+      goals1: m.goals1 || [],
+      goals2: m.goals2 || []
     };
   });
   
