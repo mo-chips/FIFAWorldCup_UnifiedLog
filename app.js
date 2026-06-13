@@ -568,13 +568,16 @@ function renderStandings() {
       // Status is in-progress
       if (team.groupPos === 1) {
         statusText = '1st in Group';
+        statusBadgeClass = 'q-direct';
       } else if (team.groupPos === 2) {
         statusText = '2nd in Group';
+        statusBadgeClass = 'q-direct';
       } else if (team.groupPos === 3) {
         statusText = '3rd (Pending)';
-        statusBadgeClass = 'pending-wc';
+        statusBadgeClass = 'q-wildcard';
       } else {
         statusText = '4th in Group';
+        statusBadgeClass = 'eliminated';
       }
     }
     
@@ -1081,6 +1084,11 @@ function setupUIEventListeners() {
     filtersBar.style.display = 'block';
     sortToggleContainer.style.display = 'flex';
     normalViewLayout.style.display = 'none';
+    
+    const mobileLegend = document.querySelector('.mobile-only-legend');
+    if (mobileLegend) {
+      mobileLegend.classList.remove('hide');
+    }
   });
   
   btnTabNormal.addEventListener('click', () => {
@@ -1091,6 +1099,11 @@ function setupUIEventListeners() {
     filtersBar.style.display = 'none';
     sortToggleContainer.style.display = 'none';
     normalViewLayout.style.display = 'flex';
+    
+    const mobileLegend = document.querySelector('.mobile-only-legend');
+    if (mobileLegend) {
+      mobileLegend.classList.add('hide');
+    }
   });
 
   // Sort view toggles
@@ -1128,24 +1141,7 @@ function setupUIEventListeners() {
       renderStandings();
     });
   });
-  
-  // Populate group letters A to L filter
-  const groupFilterContainer = document.getElementById('groupFilterContainer');
-  const alphabet = 'ABCDEFGHIJKL'.split('');
-  alphabet.forEach(letter => {
-    const btn = document.createElement('button');
-    btn.className = 'badge-filter';
-    btn.textContent = letter;
-    btn.setAttribute('data-filter', letter);
-    btn.addEventListener('click', () => {
-      // Deactivate all others
-      document.querySelectorAll('.badge-filter').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      currentFilter = letter;
-      renderStandings();
-    });
-    groupFilterContainer.appendChild(btn);
-  });
+
   
   // Matchday filter selector
   const selectMatchday = document.getElementById('selectMatchday');

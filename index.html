@@ -81,12 +81,9 @@
               <button class="badge-filter" data-filter="third-place">3rd Place Comp</button>
               <button class="badge-filter" data-filter="eliminated">Eliminated</button>
             </div>
-            <div class="filter-divider"></div>
-            <div class="filter-group group-letters" id="groupFilterContainer">
-              <!-- Dynamically populated group letters A to L -->
-            </div>
           </div>
         </div>
+
 
         <!-- Table Container -->
         <div class="table-scroll-container" id="unifiedTableWrapper">
@@ -115,6 +112,13 @@
           </table>
         </div>
 
+        <!-- Legend (Mobile Only below Unified Table) -->
+        <div class="standings-legend mobile-only-legend">
+          <div class="legend-item"><span class="legend-color color-q-direct"></span> Top 2 (Auto-Qualify)</div>
+          <div class="legend-item"><span class="legend-color color-q-wildcard"></span> Best 8 Third-Place</div>
+          <div class="legend-item"><span class="legend-color color-eliminated"></span> Eliminated</div>
+        </div>
+
         <!-- Normal View Layout Container -->
         <div class="normal-view-layout" id="normalViewLayout" style="display: none;">
           <div class="groups-grid-container" id="groupsGridContainer">
@@ -126,12 +130,7 @@
           </aside>
         </div>
 
-        <!-- Legend -->
-        <div class="standings-legend">
-          <div class="legend-item"><span class="legend-color color-q-direct"></span> Top 2 (Auto-Qualify)</div>
-          <div class="legend-item"><span class="legend-color color-q-wildcard"></span> Best 8 Third-Place</div>
-          <div class="legend-item"><span class="legend-color color-eliminated"></span> Eliminated</div>
-        </div>
+
       </section>
 
       <!-- Right Column: Matches & Live Feed -->
@@ -151,9 +150,8 @@
       </section>
     </main>
 
-    <!-- Footer -->
     <footer class="app-footer">
-      <p>Data provided by API-Football with a resilient fallback to OpenFootball Community Data. World Cup 2026 is hosted in 🇨🇦 Canada, 🇲🇽 Mexico, and 🇺🇸 USA.</p>
+      <p>Data provided by OpenFootball Community Data. World Cup 2026 is hosted in 🇨🇦 Canada, 🇲🇽 Mexico, and 🇺🇸 USA.</p>
     </footer>
   </div>
 

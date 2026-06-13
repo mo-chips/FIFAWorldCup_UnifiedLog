@@ -394,24 +394,11 @@ h2 {
   font-weight: 600;
 }
 
-.filter-divider {
-  height: 1px;
-  background: var(--border-color);
-  width: 100%;
-}
-
-.group-letters .badge-filter {
-  width: 30px;
-  height: 30px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border-radius: 50%;
-}
 
 /* Standings Table */
 .table-scroll-container {
+  width: 100%;
+  max-width: 100%;
   overflow-x: auto;
   border-radius: 10px;
   border: 1px solid var(--border-color);
@@ -1158,8 +1145,102 @@ h2 {
   }
 }
 
-/* Responsive Standings Table tweaks */
+/* Mobile-specific styling (max-width: 600px) */
 @media (max-width: 600px) {
+  
+  .card-header-actions {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 12px !important;
+  }
+  
+  .view-tabs {
+    justify-content: center !important;
+    width: 100% !important;
+  }
+  
+  .toggle-container {
+    justify-content: space-between !important;
+    width: 100% !important;
+  }
+  
+  .toggle-buttons {
+    flex: 1 !important;
+    display: flex !important;
+  }
+  
+  .btn-toggle {
+    flex: 1 !important;
+    text-align: center !important;
+    font-size: 0.75rem !important;
+    padding: 6px 4px !important;
+  }
+
+  /* Prevent standings container from stretching wider than the screen */
+  .section-standings {
+    min-width: 0 !important;
+    width: 100% !important;
+    padding: 12px !important;
+    box-sizing: border-box !important;
+  }
+  
+  .table-scroll-container {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Table column resizing and padding tightening on mobile */
+  .standings-table th, .standings-table td {
+    padding: 8px 4px !important;
+  }
+
+  .col-rank {
+    width: 35px !important;
+    text-align: center !important;
+  }
+
+  .col-team {
+    width: auto !important;
+    max-width: 130px !important;
+    white-space: normal !important;
+    word-break: break-word !important;
+    padding-left: 6px !important;
+  }
+
+  .team-badge-cell {
+    display: block !important;
+    white-space: normal !important;
+  }
+
+  .team-badge-cell .team-flag {
+    display: inline-block !important;
+    vertical-align: middle !important;
+    margin-right: 4px !important;
+    width: 18px !important;
+    height: 12px !important;
+  }
+
+  .team-name {
+    display: inline !important;
+    white-space: normal !important;
+    line-height: 1.2 !important;
+    font-size: 0.85rem !important;
+  }
+
+  .col-num {
+    width: 35px !important;
+    text-align: center !important;
+  }
+
+  .col-pts {
+    width: 40px !important;
+    text-align: center !important;
+  }
+
+  /* Hide details on mobile: Rank, Team, MP, PTS, Status only */
+  .standings-table th.col-group,
+  .standings-table td.col-group,
   .standings-table th:nth-child(5), /* W */
   .standings-table td:nth-child(5),
   .standings-table th:nth-child(6), /* D */
@@ -1169,15 +1250,78 @@ h2 {
   .standings-table th:nth-child(8), /* GF */
   .standings-table td:nth-child(8),
   .standings-table th:nth-child(9), /* GA */
-  .standings-table td:nth-child(9) {
-    display: none;
+  .standings-table td:nth-child(9),
+  .standings-table th:nth-child(10), /* GD */
+  .standings-table td:nth-child(10) {
+    display: none !important;
+  }
+  
+  /* Status Column styling on mobile */
+  .col-status {
+    width: 40px !important;
+    text-align: center !important;
+    padding: 8px 2px !important;
+  }
+  
+  /* Turn status badges into glowing circular dots on mobile */
+  .status-badge {
+    width: 12px !important;
+    height: 12px !important;
+    border-radius: 50% !important;
+    padding: 0 !important;
+    font-size: 0 !important;
+    display: inline-block !important;
+    vertical-align: middle !important;
+    color: transparent !important;
+    overflow: hidden !important;
+    text-indent: -9999px !important;
+    border: none !important;
+  }
+  
+  .status-badge.q-direct {
+    background-color: var(--qualify-direct) !important;
+    box-shadow: 0 0 8px var(--qualify-direct) !important;
+  }
+  
+  .status-badge.q-wildcard {
+    background-color: var(--qualify-wildcard) !important;
+    box-shadow: 0 0 8px var(--qualify-wildcard) !important;
+  }
+  
+  .status-badge.eliminated {
+    background-color: var(--eliminated) !important;
+    box-shadow: 0 0 8px var(--eliminated) !important;
+  }
+  
+  .status-badge.in-progress {
+    background-color: var(--accent-gold) !important;
+    box-shadow: 0 0 8px var(--accent-gold) !important;
+  }
+  
+  .status-badge.pending-wc {
+    background-color: var(--qualify-wildcard) !important;
+    box-shadow: 0 0 6px var(--qualify-wildcard) !important;
+  }
+  
+  /* Standings legend mobile styling */
+  .mobile-only-legend {
+    display: flex !important;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-top: 16px;
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
   }
 }
 
-@media (max-width: 480px) {
-  .standings-table th.col-status,
-  .standings-table td.col-status {
-    display: none;
-  }
+/* Hide mobile-only elements on desktop */
+.mobile-only-legend {
+  display: none;
+}
+
+.mobile-only-legend.hide {
+  display: none !important;
 }
 
