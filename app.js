@@ -1073,6 +1073,29 @@ function setupUIEventListeners() {
   selectMatchday.addEventListener('change', () => {
     renderMatches();
   });
+  
+  // Cache Refresh Button listener
+  const btnRefreshCache = document.getElementById('btnRefreshCache');
+  if (btnRefreshCache) {
+    btnRefreshCache.addEventListener('click', async () => {
+      // Clear cache
+      localStorage.removeItem('fifa_2026_matches_data');
+      localStorage.removeItem('fifa_2026_matches_cache_time');
+      
+      // Animate rotation
+      btnRefreshCache.style.transition = 'transform 0.5s ease-in-out';
+      btnRefreshCache.style.transform = 'rotate(360deg)';
+      
+      // Fetch fresh data
+      await fetchTournamentData();
+      
+      // Reset rotation style after animation
+      setTimeout(() => {
+        btnRefreshCache.style.transform = '';
+        btnRefreshCache.style.transition = 'transform 0.2s ease-in-out';
+      }, 500);
+    });
+  }
 }
 
 // ----------------------------------------------------

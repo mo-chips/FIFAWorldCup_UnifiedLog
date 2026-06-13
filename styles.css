@@ -130,6 +130,26 @@ body {
   font-weight: 500;
 }
 
+.btn-refresh-cache {
+  background: transparent;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  font-size: 0.85rem;
+  margin-left: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s ease-in-out;
+  padding: 2px;
+  border-radius: 4px;
+}
+
+.btn-refresh-cache:hover {
+  transform: rotate(180deg);
+  background: rgba(255, 255, 255, 0.1);
+}
+
 .status-dot {
   width: 8px;
   height: 8px;
