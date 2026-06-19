@@ -127,6 +127,7 @@ let searchQuery = '';
 let topGoalscorers = [];
 let groupsData = {};
 let favoriteTeams = new Set();
+let wildcardAssignments = {};
 
 function loadFavorites() {
   try {
@@ -317,23 +318,212 @@ function simulateElimination(teamName, teams, unplayed, matchIdx) {
   return res;
 }
 
+function isWildcardQualificationGuaranteed(teamName, allGroups, allMatches) {
+  let grpLetter = null;
+  for (let g in allGroups) {
+    if (allGroups[g].some(t => t.name === teamName)) {
+      grpLetter = g;
+      break;
+    }
+  }
+  if (!grpLetter) return false;
+  
+  const groupTeams = allGroups[grpLetter];
+  const groupMatches = allMatches.filter(m => {
+    const names = groupTeams.map(t => t.name);
+    return names.includes(m.team1) && names.includes(m.team2);
+  });
+  
+  const unplayed = groupMatches.filter(m => !m.score || !m.score.ft);
+  let worstPos = 1;
+  let worstPts = 9;
+  
+  function backtrackGroup(matchIdx, simTeams) {
+    if (matchIdx === unplayed.length) {
+      const targetTeam = simTeams.find(t => t.name === teamName);
+      const targetPts = targetTeam.simPts;
+      let countAhead = 0;
+      simTeams.forEach(t => {
+        if (t.name !== teamName && t.simPts >= targetPts) {
+          countAhead++;
+        }
+      });
+      const pos = countAhead + 1;
+      if (pos > worstPos) worstPos = pos;
+      if (targetPts < worstPts) worstPts = targetPts;
+      return;
+    }
+    const match = unplayed[matchIdx];
+    const t1 = simTeams.find(t => t.name === match.team1);
+    const t2 = simTeams.find(t => t.name === match.team2);
+    if (!t1 || !t2) return backtrackGroup(matchIdx + 1, simTeams);
+    
+    const t1Pts = t1.simPts;
+    const t2Pts = t2.simPts;
+    
+    // Win t1
+    t1.simPts += 3;
+    backtrackGroup(matchIdx + 1, simTeams);
+    t1.simPts = t1Pts;
+    
+    // Draw
+    t1.simPts += 1;
+    t2.simPts += 1;
+    backtrackGroup(matchIdx + 1, simTeams);
+    t1.simPts = t1Pts;
+    t2.simPts = t2Pts;
+    
+    // Win t2
+    t2.simPts += 3;
+    backtrackGroup(matchIdx + 1, simTeams);
+    t2.simPts = t2Pts;
+  }
+  
+  const initialTeams = groupTeams.map(t => ({ name: t.name, simPts: t.pts }));
+  backtrackGroup(0, initialTeams);
+  
+  if (worstPos === 4) {
+    return false;
+  }
+  
+  if (worstPos <= 2) {
+    return true;
+  }
+  
+  const otherMaxThirdPts = [];
+  
+  for (let otherGrpLetter in allGroups) {
+    if (otherGrpLetter === grpLetter) continue;
+    
+    const otherTeams = allGroups[otherGrpLetter];
+    const otherMatches = allMatches.filter(m => {
+      const names = otherTeams.map(t => t.name);
+      return names.includes(m.team1) && names.includes(m.team2);
+    });
+    const otherUnplayed = otherMatches.filter(m => !m.score || !m.score.ft);
+    
+    let maxThirdPts = 0;
+    
+    function backtrackOther(matchIdx, simTeams) {
+      if (matchIdx === otherUnplayed.length) {
+        const standings = simTeams.map(t => ({ ...t })).sort((a, b) => b.simPts - a.simPts);
+        const thirdTeam = standings[2];
+        if (thirdTeam && thirdTeam.simPts > maxThirdPts) {
+          maxThirdPts = thirdTeam.simPts;
+        }
+        return;
+      }
+      const match = otherUnplayed[matchIdx];
+      const t1 = simTeams.find(t => t.name === match.team1);
+      const t2 = simTeams.find(t => t.name === match.team2);
+      if (!t1 || !t2) return backtrackOther(matchIdx + 1, simTeams);
+      
+      const t1Pts = t1.simPts;
+      const t2Pts = t2.simPts;
+      
+      t1.simPts += 3;
+      backtrackOther(matchIdx + 1, simTeams);
+      t1.simPts = t1Pts;
+      
+      t1.simPts += 1;
+      t2.simPts += 1;
+      backtrackOther(matchIdx + 1, simTeams);
+      t1.simPts = t1Pts;
+      t2.simPts = t2Pts;
+      
+      t2.simPts += 3;
+      backtrackOther(matchIdx + 1, simTeams);
+      t2.simPts = t2Pts;
+    }
+    
+    const otherInitialTeams = otherTeams.map(t => ({ name: t.name, simPts: t.pts }));
+    backtrackOther(0, otherInitialTeams);
+    otherMaxThirdPts.push(maxThirdPts);
+  }
+  
+  otherMaxThirdPts.sort((a, b) => b - a);
+  
+  return worstPts > otherMaxThirdPts[7];
+}
+
+function calculateWildcardAssignments(thirdPlaceTeams) {
+  const qualifiedThirdTeams = thirdPlaceTeams.slice(0, 8);
+  const slots = [
+    { id: '3A/B/C/D/F', groups: ['A', 'B', 'C', 'D', 'F'], opponentGroup: 'E' },
+    { id: '3C/D/F/G/H', groups: ['C', 'D', 'F', 'G', 'H'], opponentGroup: 'I' },
+    { id: '3C/E/F/H/I', groups: ['C', 'E', 'F', 'H', 'I'], opponentGroup: 'A' },
+    { id: '3E/H/I/J/K', groups: ['E', 'H', 'I', 'J', 'K'], opponentGroup: 'L' },
+    { id: '3B/E/F/I/J', groups: ['B', 'E', 'F', 'I', 'J'], opponentGroup: 'D' },
+    { id: '3A/E/H/I/J', groups: ['A', 'E', 'H', 'I', 'J'], opponentGroup: 'G' },
+    { id: '3E/F/G/I/J', groups: ['E', 'F', 'G', 'I', 'J'], opponentGroup: 'B' },
+    { id: '3D/E/I/J/L', groups: ['D', 'E', 'I', 'J', 'L'], opponentGroup: 'K' }
+  ];
+  
+  const assignment = {};
+  const used = new Set();
+  
+  function backtrack(slotIdx) {
+    if (slotIdx === slots.length) return true;
+    const slot = slots[slotIdx];
+    for (let i = 0; i < qualifiedThirdTeams.length; i++) {
+      if (used.has(i)) continue;
+      const team = qualifiedThirdTeams[i];
+      if (slot.groups.includes(team.group) && team.group !== slot.opponentGroup) {
+        assignment[slot.id] = team.name;
+        used.add(i);
+        if (backtrack(slotIdx + 1)) return true;
+        used.delete(i);
+        delete assignment[slot.id];
+      }
+    }
+    return false;
+  }
+  
+  if (backtrack(0)) {
+    wildcardAssignments = assignment;
+    return;
+  }
+  
+  const fallbackAssignment = {};
+  const fallbackUsed = new Set();
+  slots.forEach(slot => {
+    const matchTeam = qualifiedThirdTeams.find((team, idx) => {
+      return !fallbackUsed.has(idx) && slot.groups.includes(team.group);
+    });
+    if (matchTeam) {
+      fallbackAssignment[slot.id] = matchTeam.name;
+      fallbackUsed.add(qualifiedThirdTeams.indexOf(matchTeam));
+    } else {
+      const anyTeam = qualifiedThirdTeams.find((team, idx) => !fallbackUsed.has(idx));
+      if (anyTeam) {
+        fallbackAssignment[slot.id] = anyTeam.name;
+        fallbackUsed.add(qualifiedThirdTeams.indexOf(anyTeam));
+      }
+    }
+  });
+  wildcardAssignments = fallbackAssignment;
+}
+
 function resolveTeamName(name) {
   if (!name) return '';
+  if (name.startsWith('3')) {
+    if (wildcardAssignments[name]) {
+      return wildcardAssignments[name];
+    }
+    return name;
+  }
   const match = name.match(/^([12])([A-L])$/);
   if (match) {
     const pos = parseInt(match[1]);
     const grpLetter = match[2];
     const groupTeams = groupsData[grpLetter];
     if (groupTeams && groupTeams[pos - 1]) {
-      const team = groupTeams[pos - 1];
-      const groupFinished = groupTeams.every(t => t.mp === 3);
-      if (groupFinished || team.status === 'qualified-direct') {
-        return team.name;
-      }
+      return groupTeams[pos - 1].name;
     }
   }
   return name;
 }
+
 
 function toggleFavorite(teamName) {
   if (favoriteTeams.has(teamName)) {
@@ -645,6 +835,8 @@ function computeStandingsFromStats(teamStats) {
         team.status = 'qualified-direct';
       } else if (isEliminationGuaranteed(team.name, groups[grpLetter], groupMatches)) {
         team.status = 'eliminated';
+      } else if (isWildcardQualificationGuaranteed(team.name, groups, matches)) {
+        team.status = 'qualified-wildcard';
       }
     }
     
@@ -663,6 +855,9 @@ function computeStandingsFromStats(teamStats) {
     if (b.w !== a.w) return b.w - a.w;
     return a.group.localeCompare(b.group); // Group letter fallback
   });
+  
+  // Calculate wildcard assignments based on current standings
+  calculateWildcardAssignments(thirdPlaceTeams);
   
   // Only allocate wildcard qualifiers if all groups have completed playing!
   thirdPlaceTeams.forEach((team, idx) => {
