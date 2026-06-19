@@ -125,6 +125,7 @@ let sortMode = 'rank'; // 'rank' or 'pure'
 let currentFilter = 'all'; // 'all', 'qualified', 'third-place', 'eliminated', or Group letter 'A'-'L'
 let searchQuery = '';
 let topGoalscorers = [];
+let groupsData = {};
 
 // Normalizes name from APIs to match TEAMS_DATA keys
 function normalizeTeamName(name) {
@@ -176,6 +177,142 @@ function getMatchLocalDate(dateStr, timeStr) {
   const isoStr = `${dateStr}T${hh}:${mm}:00${offset}`;
   const d = new Date(isoStr);
   return isNaN(d.getTime()) ? null : d;
+}
+
+function isDirectQualificationGuaranteed(teamName, groupTeams, groupMatches) {
+  const unplayed = groupMatches.filter(m => !m.score || !m.score.ft);
+  if (unplayed.length === 0) {
+    const team = groupTeams.find(t => t.name === teamName);
+    return team && team.groupPos <= 2;
+  }
+  const teamsClone = groupTeams.map(t => ({ name: t.name, simPts: t.pts }));
+  return simulateDirectQual(teamName, teamsClone, unplayed, 0);
+}
+
+function simulateDirectQual(teamName, teams, unplayed, matchIdx) {
+  if (matchIdx === unplayed.length) {
+    const targetTeam = teams.find(t => t.name === teamName);
+    const targetPts = targetTeam.simPts;
+    let countAhead = 0;
+    teams.forEach(t => {
+      if (t.name !== teamName && t.simPts >= targetPts) {
+        countAhead++;
+      }
+    });
+    return (countAhead + 1) <= 2;
+  }
+  const match = unplayed[matchIdx];
+  const t1 = teams.find(t => t.name === match.team1);
+  const t2 = teams.find(t => t.name === match.team2);
+  
+  if (!t1 || !t2) {
+    return simulateDirectQual(teamName, teams, unplayed, matchIdx + 1);
+  }
+  
+  const t1Pts = t1.simPts;
+  const t2Pts = t2.simPts;
+
+  // Win
+  t1.simPts += 3;
+  if (!simulateDirectQual(teamName, teams, unplayed, matchIdx + 1)) {
+    t1.simPts = t1Pts;
+    return false;
+  }
+  t1.simPts = t1Pts;
+
+  // Draw
+  t1.simPts += 1;
+  t2.simPts += 1;
+  if (!simulateDirectQual(teamName, teams, unplayed, matchIdx + 1)) {
+    t1.simPts = t1Pts;
+    t2.simPts = t2Pts;
+    return false;
+  }
+  t1.simPts = t1Pts;
+  t2.simPts = t2Pts;
+
+  // Loss
+  t2.simPts += 3;
+  const res = simulateDirectQual(teamName, teams, unplayed, matchIdx + 1);
+  t2.simPts = t2Pts;
+  return res;
+}
+
+function isEliminationGuaranteed(teamName, groupTeams, groupMatches) {
+  const unplayed = groupMatches.filter(m => !m.score || !m.score.ft);
+  if (unplayed.length === 0) {
+    const team = groupTeams.find(t => t.name === teamName);
+    return team && team.groupPos === 4;
+  }
+  const teamsClone = groupTeams.map(t => ({ name: t.name, simPts: t.pts }));
+  return simulateElimination(teamName, teamsClone, unplayed, 0);
+}
+
+function simulateElimination(teamName, teams, unplayed, matchIdx) {
+  if (matchIdx === unplayed.length) {
+    const targetTeam = teams.find(t => t.name === teamName);
+    const targetPts = targetTeam.simPts;
+    let countStrictlyAhead = 0;
+    teams.forEach(t => {
+      if (t.name !== teamName && t.simPts > targetPts) {
+        countStrictlyAhead++;
+      }
+    });
+    return (countStrictlyAhead + 1) === 4;
+  }
+  const match = unplayed[matchIdx];
+  const t1 = teams.find(t => t.name === match.team1);
+  const t2 = teams.find(t => t.name === match.team2);
+  
+  if (!t1 || !t2) {
+    return simulateElimination(teamName, teams, unplayed, matchIdx + 1);
+  }
+  
+  const t1Pts = t1.simPts;
+  const t2Pts = t2.simPts;
+
+  // Win
+  t1.simPts += 3;
+  if (!simulateElimination(teamName, teams, unplayed, matchIdx + 1)) {
+    t1.simPts = t1Pts;
+    return false;
+  }
+  t1.simPts = t1Pts;
+
+  // Draw
+  t1.simPts += 1;
+  t2.simPts += 1;
+  if (!simulateElimination(teamName, teams, unplayed, matchIdx + 1)) {
+    t1.simPts = t1Pts;
+    t2.simPts = t2Pts;
+    return false;
+  }
+  t1.simPts = t1Pts;
+  t2.simPts = t2Pts;
+
+  // Loss
+  t2.simPts += 3;
+  const res = simulateElimination(teamName, teams, unplayed, matchIdx + 1);
+  t2.simPts = t2Pts;
+  return res;
+}
+
+function resolveTeamName(name) {
+  if (!name) return '';
+  const match = name.match(/^([12])([A-L])$/);
+  if (match) {
+    const pos = parseInt(match[1]);
+    const grpLetter = match[2];
+    const groupTeams = groupsData[grpLetter];
+    if (groupTeams && groupTeams[pos - 1]) {
+      const team = groupTeams[pos - 1];
+      const groupFinished = groupTeams.every(t => t.mp === 3);
+      if (groupFinished || team.status === 'qualified-direct') {
+        return team.name;
+      }
+    }
+  }
+  return name;
 }
 
 function populateMatchdayDropdown() {
@@ -301,6 +438,13 @@ function processOpenFootballData(openMatches) {
       goals1: m.goals1 || [],
       goals2: m.goals2 || []
     };
+  });
+  
+  // Sort matches chronologically before timezone conversion or rendering
+  matches.sort((a, b) => {
+    const dateA = getMatchLocalDate(a.date, a.time) || new Date(a.date + 'T00:00:00');
+    const dateB = getMatchLocalDate(b.date, b.time) || new Date(b.date + 'T00:00:00');
+    return dateA - dateB;
   });
   
   calculateStandingsFromMatches();
@@ -429,6 +573,9 @@ function computeStandingsFromStats(teamStats) {
     });
   }
   
+  // Store groups globally for placeholder resolution
+  groupsData = groups;
+  
   // 2. Identify Direct Qualifiers and Candidates
   const firstPlaceTeams = [];
   const secondPlaceTeams = [];
@@ -450,6 +597,17 @@ function computeStandingsFromStats(teamStats) {
       if (team.groupPos === 1 || team.groupPos === 2) {
         team.status = 'qualified-direct';
       } else if (team.groupPos === 4) {
+        team.status = 'eliminated';
+      }
+    } else {
+      // Group in progress: check mathematical guarantees
+      const groupMatches = matches.filter(m => {
+        const grpTeams = groups[grpLetter].map(t => t.name);
+        return grpTeams.includes(m.team1) && grpTeams.includes(m.team2);
+      });
+      if (isDirectQualificationGuaranteed(team.name, groups[grpLetter], groupMatches)) {
+        team.status = 'qualified-direct';
+      } else if (isEliminationGuaranteed(team.name, groups[grpLetter], groupMatches)) {
         team.status = 'eliminated';
       }
     }
@@ -642,8 +800,11 @@ function renderMatches() {
       matchesList.appendChild(headerDiv);
     }
     
-    const flag1Url = TEAM_FLAG_CODES[m.team1] ? `https://flagcdn.com/w40/${TEAM_FLAG_CODES[m.team1]}.png` : 'https://flagcdn.com/w40/un.png';
-    const flag2Url = TEAM_FLAG_CODES[m.team2] ? `https://flagcdn.com/w40/${TEAM_FLAG_CODES[m.team2]}.png` : 'https://flagcdn.com/w40/un.png';
+    const displayTeam1 = resolveTeamName(m.team1);
+    const displayTeam2 = resolveTeamName(m.team2);
+    
+    const flag1Url = TEAM_FLAG_CODES[displayTeam1] ? `https://flagcdn.com/w40/${TEAM_FLAG_CODES[displayTeam1]}.png` : 'https://flagcdn.com/w40/un.png';
+    const flag2Url = TEAM_FLAG_CODES[displayTeam2] ? `https://flagcdn.com/w40/${TEAM_FLAG_CODES[displayTeam2]}.png` : 'https://flagcdn.com/w40/un.png';
     
     const card = document.createElement('div');
     card.className = 'match-card';
@@ -673,15 +834,15 @@ function renderMatches() {
       </div>
       <div class="match-score-row">
         <div class="match-team team-left">
-          <span class="team-name">${m.team1}</span>
-          <img class="team-flag match-team-flag" src="${flag1Url}" alt="${m.team1} flag" width="20" height="13">
+          <span class="team-name">${displayTeam1}</span>
+          <img class="team-flag match-team-flag" src="${flag1Url}" alt="${displayTeam1} flag" width="20" height="13">
         </div>
         <div class="match-score-area">
           ${scoreSection}
         </div>
         <div class="match-team team-right">
-          <img class="team-flag match-team-flag" src="${flag2Url}" alt="${m.team2} flag" width="20" height="13">
-          <span class="team-name">${m.team2}</span>
+          <img class="team-flag match-team-flag" src="${flag2Url}" alt="${displayTeam2} flag" width="20" height="13">
+          <span class="team-name">${displayTeam2}</span>
         </div>
       </div>
       <div class="match-venue">${m.ground || 'Host Venue'}</div>
