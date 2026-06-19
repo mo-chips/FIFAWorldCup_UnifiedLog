@@ -126,6 +126,26 @@ let currentFilter = 'all'; // 'all', 'qualified', 'third-place', 'eliminated', o
 let searchQuery = '';
 let topGoalscorers = [];
 let groupsData = {};
+let favoriteTeams = new Set();
+
+function loadFavorites() {
+  try {
+    const saved = localStorage.getItem('fifa_2026_favorites');
+    if (saved) {
+      favoriteTeams = new Set(JSON.parse(saved));
+    }
+  } catch (e) {
+    console.error('Error loading favorites:', e);
+  }
+}
+
+function saveFavorites() {
+  try {
+    localStorage.setItem('fifa_2026_favorites', JSON.stringify([...favoriteTeams]));
+  } catch (e) {
+    console.error('Error saving favorites:', e);
+  }
+}
 
 // Normalizes name from APIs to match TEAMS_DATA keys
 function normalizeTeamName(name) {
@@ -315,6 +335,17 @@ function resolveTeamName(name) {
   return name;
 }
 
+function toggleFavorite(teamName) {
+  if (favoriteTeams.has(teamName)) {
+    favoriteTeams.delete(teamName);
+  } else {
+    favoriteTeams.add(teamName);
+  }
+  saveFavorites();
+  renderStandings();
+  renderMatches();
+}
+
 function populateMatchdayDropdown() {
   const select = document.getElementById('selectMatchday');
   if (!select) return;
@@ -445,6 +476,11 @@ function processOpenFootballData(openMatches) {
     const dateA = getMatchLocalDate(a.date, a.time) || new Date(a.date + 'T00:00:00');
     const dateB = getMatchLocalDate(b.date, b.time) || new Date(b.date + 'T00:00:00');
     return dateA - dateB;
+  });
+  
+  // Assign chronological index to each match
+  matches.forEach((m, idx) => {
+    m.index = idx;
   });
   
   calculateStandingsFromMatches();
@@ -748,6 +784,9 @@ function renderStandings() {
       <td class="col-rank">${rankIndex}</td>
       <td class="col-team">
         <div class="team-badge-cell">
+          <button class="btn-fav-star ${favoriteTeams.has(team.name) ? 'active' : ''}" data-team="${team.name}" title="Favorite this team">
+            ${favoriteTeams.has(team.name) ? '★' : '☆'}
+          </button>
           <img class="team-flag" src="${team.flag}" alt="${team.name} flag" width="24" height="16">
           <span class="team-name">${team.name}</span>
         </div>
@@ -767,6 +806,71 @@ function renderStandings() {
   });
 }
 
+function createMatchCard(m, isPinned) {
+  const displayTeam1 = resolveTeamName(m.team1);
+  const displayTeam2 = resolveTeamName(m.team2);
+  
+  const flag1Url = TEAM_FLAG_CODES[displayTeam1] ? `https://flagcdn.com/w40/${TEAM_FLAG_CODES[displayTeam1]}.png` : 'https://flagcdn.com/w40/un.png';
+  const flag2Url = TEAM_FLAG_CODES[displayTeam2] ? `https://flagcdn.com/w40/${TEAM_FLAG_CODES[displayTeam2]}.png` : 'https://flagcdn.com/w40/un.png';
+  
+  const isFav1 = favoriteTeams.has(displayTeam1);
+  const isFav2 = favoriteTeams.has(displayTeam2);
+  const isMatchFav = isFav1 || isFav2;
+  
+  const card = document.createElement('div');
+  if (isPinned) {
+    card.className = `match-card fav-highlight pinned-fav-card`;
+    card.setAttribute('data-target-id', `match-card-regular-${m.index}`);
+    card.setAttribute('title', 'Click to scroll to chronological match');
+  } else {
+    card.className = `match-card ${isMatchFav ? 'fav-highlight' : ''}`;
+    card.id = `match-card-regular-${m.index}`;
+  }
+  
+  let scoreSection = `<span class="match-vs">vs</span>`;
+  let winner1 = '';
+  let winner2 = '';
+  
+  if (m.score && m.score.ft) {
+    const [s1, s2] = m.score.ft;
+    if (s1 > s2) winner1 = 'winner';
+    if (s2 > s1) winner2 = 'winner';
+    
+    scoreSection = `
+      <span class="match-score-num ${winner1}">${s1}</span>
+      <span class="match-vs">-</span>
+      <span class="match-score-num ${winner2}">${s2}</span>
+    `;
+  }
+  
+  const localTimeStr = m.time ? (getMatchLocalDate(m.date, m.time) ? getMatchLocalDate(m.date, m.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) + ' Local' : m.time) : '';
+  
+  const star1 = isFav1 ? '<span class="fav-star-inline">★</span>' : '';
+  const star2 = isFav2 ? '<span class="fav-star-inline">★</span>' : '';
+
+  card.innerHTML = `
+    <div class="match-meta">
+      <span class="match-group-tag">${m.group || 'Group Stage'}</span>
+      <span class="match-time">${localTimeStr}</span>
+    </div>
+    <div class="match-score-row">
+      <div class="match-team team-left">
+        <span class="team-name">${displayTeam1}${star1}</span>
+        <img class="team-flag match-team-flag" src="${flag1Url}" alt="${displayTeam1} flag" width="20" height="13">
+      </div>
+      <div class="match-score-area">
+        ${scoreSection}
+      </div>
+      <div class="match-team team-right">
+        <img class="team-flag match-team-flag" src="${flag2Url}" alt="${displayTeam2} flag" width="20" height="13">
+        <span class="team-name">${star2}${displayTeam2}</span>
+      </div>
+    </div>
+    <div class="match-venue">${m.ground || 'Host Venue'}</div>
+  `;
+  return card;
+}
+
 function renderMatches() {
   const matchesList = document.getElementById('matchesList');
   const selectedMatchday = document.getElementById('selectMatchday').value;
@@ -784,7 +888,32 @@ function renderMatches() {
     return;
   }
   
-  // Group matches by date/round for cleaner visual hierarchy
+  // 1. Pinned Favorites section
+  if (favoriteTeams.size > 0) {
+    const favMatches = filteredMatches.filter(m => {
+      const displayT1 = resolveTeamName(m.team1);
+      const displayT2 = resolveTeamName(m.team2);
+      return favoriteTeams.has(displayT1) || favoriteTeams.has(displayT2);
+    });
+    
+    if (favMatches.length > 0) {
+      const headerDiv = document.createElement('div');
+      headerDiv.className = 'matchday-group-header fav-matches-header';
+      headerDiv.innerHTML = `⭐ Favorite Team Matches`;
+      matchesList.appendChild(headerDiv);
+      
+      favMatches.forEach(m => {
+        const card = createMatchCard(m, true);
+        matchesList.appendChild(card);
+      });
+      
+      const divider = document.createElement('div');
+      divider.className = 'match-list-divider';
+      matchesList.appendChild(divider);
+    }
+  }
+  
+  // 2. Regular list
   let currentGroupHeader = '';
   
   filteredMatches.forEach(m => {
@@ -800,53 +929,7 @@ function renderMatches() {
       matchesList.appendChild(headerDiv);
     }
     
-    const displayTeam1 = resolveTeamName(m.team1);
-    const displayTeam2 = resolveTeamName(m.team2);
-    
-    const flag1Url = TEAM_FLAG_CODES[displayTeam1] ? `https://flagcdn.com/w40/${TEAM_FLAG_CODES[displayTeam1]}.png` : 'https://flagcdn.com/w40/un.png';
-    const flag2Url = TEAM_FLAG_CODES[displayTeam2] ? `https://flagcdn.com/w40/${TEAM_FLAG_CODES[displayTeam2]}.png` : 'https://flagcdn.com/w40/un.png';
-    
-    const card = document.createElement('div');
-    card.className = 'match-card';
-    
-    let scoreSection = `<span class="match-vs">vs</span>`;
-    let winner1 = '';
-    let winner2 = '';
-    
-    if (m.score && m.score.ft) {
-      const [s1, s2] = m.score.ft;
-      if (s1 > s2) winner1 = 'winner';
-      if (s2 > s1) winner2 = 'winner';
-      
-      scoreSection = `
-        <span class="match-score-num ${winner1}">${s1}</span>
-        <span class="match-vs">-</span>
-        <span class="match-score-num ${winner2}">${s2}</span>
-      `;
-    }
-    
-    const localTimeStr = m.time ? (getMatchLocalDate(m.date, m.time) ? getMatchLocalDate(m.date, m.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) + ' Local' : m.time) : '';
-    
-    card.innerHTML = `
-      <div class="match-meta">
-        <span class="match-group-tag">${m.group || 'Group Stage'}</span>
-        <span class="match-time">${localTimeStr}</span>
-      </div>
-      <div class="match-score-row">
-        <div class="match-team team-left">
-          <span class="team-name">${displayTeam1}</span>
-          <img class="team-flag match-team-flag" src="${flag1Url}" alt="${displayTeam1} flag" width="20" height="13">
-        </div>
-        <div class="match-score-area">
-          ${scoreSection}
-        </div>
-        <div class="match-team team-right">
-          <img class="team-flag match-team-flag" src="${flag2Url}" alt="${displayTeam2} flag" width="20" height="13">
-          <span class="team-name">${displayTeam2}</span>
-        </div>
-      </div>
-      <div class="match-venue">${m.ground || 'Host Venue'}</div>
-    `;
+    const card = createMatchCard(m, false);
     matchesList.appendChild(card);
   });
 }
@@ -1310,6 +1393,37 @@ function setupUIEventListeners() {
     renderMatches();
   });
   
+  // Standing table click listener for favorites (event delegation)
+  const standingsBody = document.getElementById('standingsBody');
+  if (standingsBody) {
+    standingsBody.addEventListener('click', (e) => {
+      const btn = e.target.closest('.btn-fav-star');
+      if (btn) {
+        const teamName = btn.dataset.team;
+        toggleFavorite(teamName);
+      }
+    });
+  }
+  
+  // Pinned favorites click-to-scroll listener (event delegation on matchesList)
+  const matchesList = document.getElementById('matchesList');
+  if (matchesList) {
+    matchesList.addEventListener('click', (e) => {
+      const pinnedCard = e.target.closest('.pinned-fav-card');
+      if (pinnedCard) {
+        const targetId = pinnedCard.dataset.targetId;
+        const targetEl = document.getElementById(targetId);
+        if (targetEl) {
+          targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          targetEl.classList.add('scroll-target-pulse');
+          setTimeout(() => {
+            targetEl.classList.remove('scroll-target-pulse');
+          }, 1500);
+        }
+      }
+    });
+  }
+  
   // Cache Refresh Button listener
   const btnRefreshCache = document.getElementById('btnRefreshCache');
   if (btnRefreshCache) {
@@ -1338,6 +1452,7 @@ function setupUIEventListeners() {
 // Initialize
 // ----------------------------------------------------
 document.addEventListener('DOMContentLoaded', () => {
+  loadFavorites();
   setupUIEventListeners();
   fetchTournamentData();
 });

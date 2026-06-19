@@ -1325,3 +1325,102 @@ h2 {
   display: none !important;
 }
 
+/* Favorites Feature Styles */
+.btn-fav-star {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  margin: 0;
+  font-size: 1.15rem;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.25);
+  transition: transform 0.2s ease, color 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  outline: none;
+  margin-right: 4px;
+}
+
+.btn-fav-star:hover {
+  transform: scale(1.2);
+  color: #ecc94b;
+}
+
+.btn-fav-star.active {
+  color: #ffb300;
+  text-shadow: 0 0 8px rgba(255, 179, 0, 0.4);
+}
+
+.match-card.fav-highlight {
+  border-color: rgba(255, 179, 0, 0.35) !important;
+  background: rgba(255, 179, 0, 0.03) !important;
+  box-shadow: 0 0 10px rgba(255, 179, 0, 0.1);
+}
+
+.match-card.fav-highlight:hover {
+  border-color: rgba(255, 179, 0, 0.5) !important;
+  background: rgba(255, 179, 0, 0.05) !important;
+}
+
+.fav-star-inline {
+  color: #ffb300;
+  font-size: 0.85rem;
+  margin: 0 4px;
+  vertical-align: middle;
+}
+
+.match-list-divider {
+  height: 1px;
+  background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.1), transparent);
+  margin: 16px 0;
+}
+
+.fav-matches-header {
+  color: #ffb300 !important;
+  border-bottom: 1px solid rgba(255, 179, 0, 0.2);
+  padding-bottom: 4px;
+  margin-bottom: 12px !important;
+}
+
+/* Mobile responsive styles for Favorites Star */
+@media (max-width: 600px) {
+  .team-badge-cell {
+    display: block !important;
+    white-space: normal !important;
+  }
+  
+  .btn-fav-star {
+    display: inline-flex !important;
+    vertical-align: middle !important;
+    font-size: 1rem !important;
+    margin-right: 6px !important;
+  }
+  
+  .col-team {
+    max-width: 140px !important;
+    white-space: normal !important;
+  }
+}
+
+.pinned-fav-card {
+  cursor: pointer;
+}
+
+@keyframes pulse-gold {
+  0% {
+    border-color: #ffb300;
+    box-shadow: 0 0 15px rgba(255, 179, 0, 0.6);
+  }
+  100% {
+    border-color: rgba(255, 179, 0, 0.35);
+    box-shadow: 0 0 10px rgba(255, 179, 0, 0.1);
+  }
+}
+
+.scroll-target-pulse {
+  animation: pulse-gold 1.5s ease-in-out;
+}
+
