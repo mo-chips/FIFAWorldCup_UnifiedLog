@@ -44,8 +44,8 @@
           <span class="stat-label">Goals / Match</span>
         </div>
         <div class="stat-card">
-          <span class="stat-value" id="statQualified">0 / 32</span>
-          <span class="stat-label">Teams Qualified</span>
+          <span class="stat-value" id="statQualified">32 / 48</span>
+          <span class="stat-label">Teams Remaining</span>
         </div>
       </div>
     </header>
@@ -58,6 +58,7 @@
           <div class="view-tabs">
             <button class="btn-tab active" id="btnTabUnified" title="Show the combined single log standings of all 48 teams">Unified Log</button>
             <button class="btn-tab" id="btnTabNormal" title="Show the traditional 12 group tables side-by-side">Normal View</button>
+            <button class="btn-tab" id="btnTabKnockouts" title="Show the tournament knockout bracket">Knockouts</button>
           </div>
           <div class="toggle-container" id="sortToggleContainer">
             <span class="toggle-label">Sort View:</span>
@@ -128,6 +129,11 @@
           <aside class="tournament-stats-sidebar" id="tournamentStatsSidebar">
             <!-- Dynamically populated stats -->
           </aside>
+        </div>
+        
+        <!-- Knockouts View Layout Container -->
+        <div class="knockouts-view-layout" id="knockoutsViewLayout" style="display: none;">
+          <!-- Dynamically populated bracket -->
         </div>
 
 

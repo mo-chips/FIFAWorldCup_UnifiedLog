@@ -508,7 +508,7 @@ function resolveTeamName(name) {
   if (!name) return '';
   if (name.startsWith('3')) {
     if (wildcardAssignments[name]) {
-      return wildcardAssignments[name];
+      return resolveTeamName(wildcardAssignments[name]);
     }
     return name;
   }
@@ -521,6 +521,28 @@ function resolveTeamName(name) {
       return groupTeams[pos - 1].name;
     }
   }
+  
+  // Resolve winner / loser placeholders (e.g. W74, L101)
+  const wlMatch = name.match(/^([WL])(\d+)$/);
+  if (wlMatch) {
+    const type = wlMatch[1]; // 'W' or 'L'
+    const matchNum = parseInt(wlMatch[2]);
+    const targetMatch = matches[matchNum - 1]; // 1-indexed to 0-indexed
+    
+    if (targetMatch && targetMatch.score && targetMatch.score.ft) {
+      const [s1, s2] = targetMatch.score.ft;
+      const t1 = resolveTeamName(targetMatch.team1);
+      const t2 = resolveTeamName(targetMatch.team2);
+      
+      if (s1 > s2) {
+        return type === 'W' ? t1 : t2;
+      } else if (s2 > s1) {
+        return type === 'W' ? t2 : t1;
+      }
+    }
+    return type === 'W' ? `Winner Match ${matchNum}` : `Loser Match ${matchNum}`;
+  }
+  
   return name;
 }
 
@@ -534,44 +556,46 @@ function toggleFavorite(teamName) {
   saveFavorites();
   renderStandings();
   renderMatches();
+  renderKnockoutBracket();
 }
 
 function populateMatchdayDropdown() {
   const select = document.getElementById('selectMatchday');
   if (!select) return;
   
-  const currentValue = select.value || 'all';
-  let maxPlayedMatchday = 0;
-  
+  // Extract all unique rounds in chronological order
+  const uniqueRounds = [];
   matches.forEach(m => {
-    if (m.score && m.score.ft) {
-      const match = m.round.match(/Matchday\s+(\d+)/i);
-      if (match) {
-        const num = parseInt(match[1]);
-        if (num > maxPlayedMatchday) {
-          maxPlayedMatchday = num;
-        }
-      }
+    if (m.round && !uniqueRounds.includes(m.round)) {
+      uniqueRounds.push(m.round);
     }
   });
   
-  if (maxPlayedMatchday === 0) {
-    maxPlayedMatchday = 1;
+  // Find the current matchday/round (latest played match)
+  let currentRound = uniqueRounds[0] || 'Matchday 1';
+  for (let i = matches.length - 1; i >= 0; i--) {
+    const m = matches[i];
+    if (m.score && m.score.ft) {
+      currentRound = m.round;
+      break;
+    }
   }
   
-  const maxOption = maxPlayedMatchday + 2;
+  const isInitialized = select.dataset.initialized === 'true';
+  const currentValue = select.value;
   
   let html = `<option value="all">All Matchdays</option>`;
-  for (let i = 1; i <= maxOption; i++) {
-    html += `<option value="Matchday ${i}">Matchday ${i}</option>`;
-  }
+  uniqueRounds.forEach(round => {
+    html += `<option value="${round}">${round}</option>`;
+  });
   
   select.innerHTML = html;
+  select.dataset.initialized = 'true';
   
-  if (Array.from(select.options).some(opt => opt.value === currentValue)) {
+  if (isInitialized && Array.from(select.options).some(opt => opt.value === currentValue)) {
     select.value = currentValue;
   } else {
-    select.value = 'all';
+    select.value = currentRound;
   }
 }
 
@@ -693,31 +717,34 @@ function calculateStandingsFromMatches() {
     if (!match.score || !match.score.ft) return; // Skip unplayed matches
     
     const [score1, score2] = match.score.ft;
+    const isGroupMatch = match.round && match.round.toLowerCase().startsWith('matchday');
     
-    teamStats[t1].mp += 1;
-    teamStats[t2].mp += 1;
-    teamStats[t1].gf += score1;
-    teamStats[t2].gf += score2;
-    teamStats[t1].ga += score2;
-    teamStats[t2].ga += score1;
-    
-    if (score1 > score2) {
-      teamStats[t1].w += 1;
-      teamStats[t2].l += 1;
-      teamStats[t1].pts += 3;
-    } else if (score1 < score2) {
-      teamStats[t2].w += 1;
-      teamStats[t1].l += 1;
-      teamStats[t2].pts += 3;
-    } else {
-      teamStats[t1].d += 1;
-      teamStats[t2].d += 1;
-      teamStats[t1].pts += 1;
-      teamStats[t2].pts += 1;
+    if (isGroupMatch) {
+      teamStats[t1].mp += 1;
+      teamStats[t2].mp += 1;
+      teamStats[t1].gf += score1;
+      teamStats[t2].gf += score2;
+      teamStats[t1].ga += score2;
+      teamStats[t2].ga += score1;
+      
+      if (score1 > score2) {
+        teamStats[t1].w += 1;
+        teamStats[t2].l += 1;
+        teamStats[t1].pts += 3;
+      } else if (score1 < score2) {
+        teamStats[t2].w += 1;
+        teamStats[t1].l += 1;
+        teamStats[t2].pts += 3;
+      } else {
+        teamStats[t1].d += 1;
+        teamStats[t2].d += 1;
+        teamStats[t1].pts += 1;
+        teamStats[t2].pts += 1;
+      }
+      
+      teamStats[t1].gd = teamStats[t1].gf - teamStats[t1].ga;
+      teamStats[t2].gd = teamStats[t2].gf - teamStats[t2].ga;
     }
-    
-    teamStats[t1].gd = teamStats[t1].gf - teamStats[t1].ga;
-    teamStats[t2].gd = teamStats[t2].gf - teamStats[t2].ga;
     
     // Accumulate player goals (real data from JSON goals list)
     if (match.goals1) {
@@ -891,6 +918,7 @@ function computeStandingsFromStats(teamStats) {
   
   renderStandings();
   renderNormalView();
+  renderKnockoutBracket();
   renderTournamentStats(thirdPlaceTeams, allTeams);
 }
 
@@ -983,7 +1011,7 @@ function renderStandings() {
             ${favoriteTeams.has(team.name) ? '★' : '☆'}
           </button>
           <img class="team-flag" src="${team.flag}" alt="${team.name} flag" width="24" height="16">
-          <span class="team-name">${team.name}</span>
+          <span class="team-name">${team.name.replace('Bosnia and Herzegovina', 'Bosnia &<br>Herzegovina')}</span>
         </div>
       </td>
       <td class="col-group">${team.group}</td>
@@ -1042,10 +1070,13 @@ function createMatchCard(m, isPinned) {
   
   const star1 = isFav1 ? '<span class="fav-star-inline">★</span>' : '';
   const star2 = isFav2 ? '<span class="fav-star-inline">★</span>' : '';
+  
+  const isKnockout = m.round && !m.round.toLowerCase().includes('matchday');
+  const groupTag = isKnockout ? m.round : (m.group || 'Group Stage');
 
   card.innerHTML = `
     <div class="match-meta">
-      <span class="match-group-tag">${m.group || 'Group Stage'}</span>
+      <span class="match-group-tag">${groupTag}</span>
       <span class="match-time">${localTimeStr}</span>
     </div>
     <div class="match-score-row">
@@ -1132,7 +1163,7 @@ function renderMatches() {
 function renderStats() {
   let played = 0;
   let goals = 0;
-  let qualifiedCount = 0;
+  let remainingCount = 48;
   
   matches.forEach(m => {
     if (m.score && m.score.ft) {
@@ -1142,17 +1173,19 @@ function renderStats() {
   });
   
   if (standings.pure) {
+    let eliminatedCount = 0;
     standings.pure.forEach(team => {
-      if (team.status === 'qualified-direct' || team.status === 'qualified-wildcard') {
-        qualifiedCount++;
+      if (team.status === 'eliminated') {
+        eliminatedCount++;
       }
     });
+    remainingCount = 48 - eliminatedCount;
   }
   
   document.getElementById('statMatches').textContent = played;
   document.getElementById('statGoals').textContent = goals;
   document.getElementById('statAvgGoals').textContent = played > 0 ? (goals / played).toFixed(2) : '0.00';
-  document.getElementById('statQualified').textContent = `${qualifiedCount} / 32`;
+  document.getElementById('statQualified').textContent = `${remainingCount} / 48`;
 }
 
 function showErrorState() {
@@ -1161,6 +1194,108 @@ function showErrorState() {
   
   const matchesList = document.getElementById('matchesList');
   matchesList.innerHTML = `<div class="matches-loading" style="color: var(--eliminated);">Offline: Could not load fixtures.</div>`;
+}
+
+function createBracketMatchCard(m) {
+  const displayTeam1 = resolveTeamName(m.team1);
+  const displayTeam2 = resolveTeamName(m.team2);
+  
+  const flag1Url = TEAM_FLAG_CODES[displayTeam1] ? `https://flagcdn.com/w40/${TEAM_FLAG_CODES[displayTeam1]}.png` : 'https://flagcdn.com/w40/un.png';
+  const flag2Url = TEAM_FLAG_CODES[displayTeam2] ? `https://flagcdn.com/w40/${TEAM_FLAG_CODES[displayTeam2]}.png` : 'https://flagcdn.com/w40/un.png';
+  
+  const isFav1 = favoriteTeams.has(displayTeam1);
+  const isFav2 = favoriteTeams.has(displayTeam2);
+  const isMatchFav = isFav1 || isFav2;
+  
+  const star1 = isFav1 ? '<span class="fav-star-inline">★</span>' : '';
+  const star2 = isFav2 ? '<span class="fav-star-inline">★</span>' : '';
+  
+  let score1 = '';
+  let score2 = '';
+  let winnerClass1 = '';
+  let winnerClass2 = '';
+  
+  if (m.score && m.score.ft) {
+    const [s1, s2] = m.score.ft;
+    score1 = s1;
+    score2 = s2;
+    if (s1 > s2) winnerClass1 = 'winner';
+    if (s2 > s1) winnerClass2 = 'winner';
+  }
+  
+  const matchNum = m.index + 1;
+  const localTimeStr = m.time ? (getMatchLocalDate(m.date, m.time) ? getMatchLocalDate(m.date, m.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) + ' Local' : m.time) : '';
+  const formattedDate = m.date ? new Date(m.date + 'T00:00:00').toLocaleDateString([], { month: 'short', day: 'numeric' }) : '';
+  
+  const card = document.createElement('div');
+  card.className = `bracket-match-card ${isMatchFav ? 'fav-highlight' : ''}`;
+  
+  card.innerHTML = `
+    <div class="bracket-match-meta">
+      <span>Match ${matchNum}</span>
+      <span>${formattedDate} ${localTimeStr}</span>
+    </div>
+    <div class="bracket-team-row ${winnerClass1}">
+      <div class="bracket-team-info">
+        <img class="bracket-team-flag" src="${flag1Url}" alt="${displayTeam1} flag" width="18" height="12">
+        <span class="bracket-team-name">${displayTeam1}${star1}</span>
+      </div>
+      <span class="bracket-team-score">${score1}</span>
+    </div>
+    <div class="bracket-team-row ${winnerClass2}">
+      <div class="bracket-team-info">
+        <img class="bracket-team-flag" src="${flag2Url}" alt="${displayTeam2} flag" width="18" height="12">
+        <span class="bracket-team-name">${displayTeam2}${star2}</span>
+      </div>
+      <span class="bracket-team-score">${score2}</span>
+    </div>
+    <div class="bracket-match-venue" title="${m.ground || ''}">${m.ground || 'Host Venue'}</div>
+  `;
+  return card;
+}
+
+function renderKnockoutBracket() {
+  const container = document.getElementById('knockoutsViewLayout');
+  if (!container) return;
+  
+  container.innerHTML = '';
+  
+  // Group matches by round name
+  const roundOf32Matches = matches.filter(m => m.round === 'Round of 32');
+  const roundOf16Matches = matches.filter(m => m.round === 'Round of 16');
+  const quarterFinalMatches = matches.filter(m => m.round === 'Quarter-final');
+  const semiFinalMatches = matches.filter(m => m.round === 'Semi-final');
+  const thirdPlaceMatches = matches.filter(m => m.round === 'Match for third place');
+  const finalMatches = matches.filter(m => m.round === 'Final');
+  
+  const roundGroups = [
+    { title: 'Round of 32', matches: roundOf32Matches },
+    { title: 'Round of 16', matches: roundOf16Matches },
+    { title: 'Quarter-finals', matches: quarterFinalMatches },
+    { title: 'Semi-finals', matches: semiFinalMatches },
+    { title: 'Finals', matches: [...finalMatches, ...thirdPlaceMatches] }
+  ];
+  
+  roundGroups.forEach(grp => {
+    const roundCol = document.createElement('div');
+    roundCol.className = 'bracket-round';
+    
+    const roundTitle = document.createElement('div');
+    roundTitle.className = 'bracket-round-title';
+    roundTitle.textContent = grp.title;
+    roundCol.appendChild(roundTitle);
+    
+    const matchList = document.createElement('div');
+    matchList.className = 'bracket-match-list';
+    
+    grp.matches.forEach(m => {
+      const matchCard = createBracketMatchCard(m);
+      matchList.appendChild(matchCard);
+    });
+    
+    roundCol.appendChild(matchList);
+    container.appendChild(roundCol);
+  });
 }
 
 function renderNormalView() {
@@ -1193,7 +1328,7 @@ function renderNormalView() {
           <td class="mini-col-rank">${team.groupPos}</td>
           <td class="mini-col-team">
             <img class="team-flag" src="${team.flag}" alt="${team.name} flag" width="18" height="12">
-            <span class="team-name">${team.name}</span>
+            <span class="team-name">${team.name.replace('Bosnia and Herzegovina', 'Bosnia &<br>Herzegovina')}</span>
           </td>
           <td class="mini-col-num">${team.mp}</td>
           <td class="mini-col-num">${team.gd > 0 ? '+' + team.gd : team.gd}</td>
@@ -1510,19 +1645,23 @@ function setupUIEventListeners() {
   // Tab Switching
   const btnTabUnified = document.getElementById('btnTabUnified');
   const btnTabNormal = document.getElementById('btnTabNormal');
+  const btnTabKnockouts = document.getElementById('btnTabKnockouts');
   const unifiedTableWrapper = document.getElementById('unifiedTableWrapper');
   const normalViewLayout = document.getElementById('normalViewLayout');
+  const knockoutsViewLayout = document.getElementById('knockoutsViewLayout');
   const sortToggleContainer = document.getElementById('sortToggleContainer');
   const filtersBar = document.getElementById('filtersBar');
   
   btnTabUnified.addEventListener('click', () => {
     btnTabUnified.classList.add('active');
     btnTabNormal.classList.remove('active');
+    btnTabKnockouts.classList.remove('active');
     
     unifiedTableWrapper.style.display = 'block';
     filtersBar.style.display = 'block';
     sortToggleContainer.style.display = 'flex';
     normalViewLayout.style.display = 'none';
+    knockoutsViewLayout.style.display = 'none';
     
     const mobileLegend = document.querySelector('.mobile-only-legend');
     if (mobileLegend) {
@@ -1533,11 +1672,30 @@ function setupUIEventListeners() {
   btnTabNormal.addEventListener('click', () => {
     btnTabNormal.classList.add('active');
     btnTabUnified.classList.remove('active');
+    btnTabKnockouts.classList.remove('active');
     
     unifiedTableWrapper.style.display = 'none';
     filtersBar.style.display = 'none';
     sortToggleContainer.style.display = 'none';
     normalViewLayout.style.display = 'flex';
+    knockoutsViewLayout.style.display = 'none';
+    
+    const mobileLegend = document.querySelector('.mobile-only-legend');
+    if (mobileLegend) {
+      mobileLegend.classList.add('hide');
+    }
+  });
+
+  btnTabKnockouts.addEventListener('click', () => {
+    btnTabKnockouts.classList.add('active');
+    btnTabUnified.classList.remove('active');
+    btnTabNormal.classList.remove('active');
+    
+    unifiedTableWrapper.style.display = 'none';
+    filtersBar.style.display = 'none';
+    sortToggleContainer.style.display = 'none';
+    normalViewLayout.style.display = 'none';
+    knockoutsViewLayout.style.display = 'flex';
     
     const mobileLegend = document.querySelector('.mobile-only-legend');
     if (mobileLegend) {

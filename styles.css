@@ -244,6 +244,7 @@ body {
 
 .section-standings {
   min-height: 600px;
+  min-width: 0;
 }
 
 .card-header-actions, .matches-header {
@@ -416,13 +417,13 @@ h2 {
   background: rgba(0, 0, 0, 0.25);
   color: var(--text-secondary);
   font-weight: 600;
-  padding: 12px 16px;
+  padding: 12px 8px;
   border-bottom: 1px solid var(--border-color);
   user-select: none;
 }
 
 .standings-table td {
-  padding: 12px 16px;
+  padding: 12px 8px;
   border-bottom: 1px solid var(--border-color);
   color: var(--text-primary);
   font-weight: 400;
@@ -463,13 +464,13 @@ h2 {
 .col-rank {
   font-weight: 600 !important;
   color: var(--text-secondary);
-  width: 50px;
+  width: 40px;
   text-align: center;
 }
 
 .col-team {
   font-weight: 600 !important;
-  width: 250px;
+  width: 170px;
 }
 
 .team-badge-cell {
@@ -496,12 +497,12 @@ h2 {
 .col-group {
   text-align: center;
   color: var(--text-secondary);
-  width: 60px;
+  width: 45px;
 }
 
 .col-num {
   text-align: center;
-  width: 50px;
+  width: 38px;
 }
 
 .col-pts {
@@ -509,11 +510,11 @@ h2 {
   color: #fff;
   text-align: center;
   background: rgba(255, 255, 255, 0.02);
-  width: 60px;
+  width: 45px;
 }
 
 .col-status {
-  width: 120px;
+  width: 100px;
 }
 
 .status-badge {
@@ -1422,5 +1423,164 @@ h2 {
 
 .scroll-target-pulse {
   animation: pulse-gold 1.5s ease-in-out;
+}
+
+/* Knockout Bracket Styles */
+.knockouts-view-layout {
+  display: flex;
+  gap: 32px;
+  overflow-x: auto;
+  padding: 24px 16px;
+  background: var(--bg-card);
+  border-radius: var(--card-radius);
+  border: 1px solid var(--border-color);
+  min-height: 600px;
+  margin-top: 16px;
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-color) transparent;
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.knockouts-view-layout::-webkit-scrollbar {
+  height: 8px;
+}
+
+.knockouts-view-layout::-webkit-scrollbar-thumb {
+  background-color: var(--border-color);
+  border-radius: 4px;
+}
+
+.bracket-round {
+  display: flex;
+  flex-direction: column;
+  width: 220px;
+  flex-shrink: 0;
+}
+
+.bracket-round-title {
+  font-size: 1.15rem;
+  font-weight: 800;
+  text-align: center;
+  margin-bottom: 24px;
+  color: var(--active-blue);
+  border-bottom: 2px solid var(--border-color);
+  padding-bottom: 8px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.bracket-match-list {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  height: 100%;
+  gap: 16px;
+}
+
+.bracket-match-card {
+  display: flex;
+  flex-direction: column;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-color);
+  border-radius: var(--button-radius);
+  padding: 10px 12px;
+  position: relative;
+  transition: var(--transition);
+}
+
+.bracket-match-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+  border-color: var(--active-blue);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.bracket-match-card.fav-highlight {
+  border-color: rgba(251, 191, 36, 0.4);
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.06), rgba(255, 255, 255, 0.01));
+  box-shadow: 0 0 12px rgba(251, 191, 36, 0.1);
+}
+
+.bracket-match-card.fav-highlight:hover {
+  border-color: rgba(251, 191, 36, 0.6);
+  box-shadow: 0 0 15px rgba(251, 191, 36, 0.2);
+}
+
+.bracket-match-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+  border-bottom: 1px dashed var(--border-color);
+  padding-bottom: 4px;
+}
+
+.bracket-team-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 0;
+}
+
+.bracket-team-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.bracket-team-flag {
+  border-radius: 2px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  flex-shrink: 0;
+}
+
+.bracket-team-name {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 120px;
+}
+
+.bracket-match-card.fav-highlight .bracket-team-name {
+  color: var(--text-primary);
+}
+
+.bracket-team-row.winner .bracket-team-name {
+  color: #fff;
+  font-weight: 700;
+}
+
+.bracket-team-score {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  width: 24px;
+  text-align: right;
+}
+
+.bracket-team-row.winner .bracket-team-score {
+  color: var(--active-blue);
+}
+
+.bracket-match-venue {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  margin-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.03);
+  padding-top: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
