@@ -697,6 +697,33 @@ function processOpenFootballData(openMatches) {
     m.index = idx;
   });
   
+  // Correct knockout stage placeholders to establish correct bracket pairings
+  if (matches.length >= 104) {
+    // Round of 16
+    matches[88].team1 = 'W73'; matches[88].team2 = 'W76'; // Match 89
+    matches[89].team1 = 'W74'; matches[89].team2 = 'W77'; // Match 90
+    matches[90].team1 = 'W75'; matches[90].team2 = 'W78'; // Match 91
+    matches[91].team1 = 'W79'; matches[91].team2 = 'W80'; // Match 92
+    matches[92].team1 = 'W83'; matches[92].team2 = 'W84'; // Match 93
+    matches[93].team1 = 'W81'; matches[93].team2 = 'W82'; // Match 94
+    matches[94].team1 = 'W86'; matches[94].team2 = 'W88'; // Match 95
+    matches[95].team1 = 'W85'; matches[95].team2 = 'W87'; // Match 96
+    
+    // Quarter-finals
+    matches[96].team1 = 'W89'; matches[96].team2 = 'W90'; // Match 97
+    matches[97].team1 = 'W93'; matches[97].team2 = 'W94'; // Match 98
+    matches[98].team1 = 'W91'; matches[98].team2 = 'W92'; // Match 99
+    matches[99].team1 = 'W95'; matches[99].team2 = 'W96'; // Match 100
+    
+    // Semi-finals
+    matches[100].team1 = 'W97';  matches[100].team2 = 'W98';  // Match 101
+    matches[101].team1 = 'W99';  matches[101].team2 = 'W100'; // Match 102
+    
+    // Finals
+    matches[102].team1 = 'L101'; matches[102].team2 = 'L102'; // Match 103 (Third place)
+    matches[103].team1 = 'W101'; matches[103].team2 = 'W102'; // Match 104 (Final)
+  }
+  
   calculateStandingsFromMatches();
 }
 
@@ -1260,20 +1287,19 @@ function renderKnockoutBracket() {
   
   container.innerHTML = '';
   
-  // Group matches by round name
-  const roundOf32Matches = matches.filter(m => m.round === 'Round of 32');
-  const roundOf16Matches = matches.filter(m => m.round === 'Round of 16');
-  const quarterFinalMatches = matches.filter(m => m.round === 'Quarter-final');
-  const semiFinalMatches = matches.filter(m => m.round === 'Semi-final');
-  const thirdPlaceMatches = matches.filter(m => m.round === 'Match for third place');
-  const finalMatches = matches.filter(m => m.round === 'Final');
+  // Define explicit 1-indexed match number order for each column to match bracket flow
+  const r32Order = [73, 76, 74, 77, 83, 84, 81, 82, 75, 78, 79, 80, 86, 88, 85, 87];
+  const r16Order = [89, 90, 93, 94, 91, 92, 95, 96];
+  const qfOrder = [97, 98, 99, 100];
+  const sfOrder = [101, 102];
+  const finalsOrder = [104, 103]; // Final (104) first, then Third-place (103)
   
   const roundGroups = [
-    { title: 'Round of 32', matches: roundOf32Matches },
-    { title: 'Round of 16', matches: roundOf16Matches },
-    { title: 'Quarter-finals', matches: quarterFinalMatches },
-    { title: 'Semi-finals', matches: semiFinalMatches },
-    { title: 'Finals', matches: [...finalMatches, ...thirdPlaceMatches] }
+    { title: 'Round of 32', order: r32Order },
+    { title: 'Round of 16', order: r16Order },
+    { title: 'Quarter-finals', order: qfOrder },
+    { title: 'Semi-finals', order: sfOrder },
+    { title: 'Finals', order: finalsOrder }
   ];
   
   roundGroups.forEach(grp => {
@@ -1288,9 +1314,13 @@ function renderKnockoutBracket() {
     const matchList = document.createElement('div');
     matchList.className = 'bracket-match-list';
     
-    grp.matches.forEach(m => {
-      const matchCard = createBracketMatchCard(m);
-      matchList.appendChild(matchCard);
+    grp.order.forEach(matchNum => {
+      // Find the match in the global matches array (match index = matchNum - 1)
+      const m = matches.find(match => (match.index + 1) === matchNum);
+      if (m) {
+        const matchCard = createBracketMatchCard(m);
+        matchList.appendChild(matchCard);
+      }
     });
     
     roundCol.appendChild(matchList);
