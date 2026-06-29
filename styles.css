@@ -1565,7 +1565,7 @@ h2 {
   font-size: 0.88rem;
   font-weight: 700;
   color: var(--text-muted);
-  width: 24px;
+  min-width: 24px;
   text-align: right;
 }
 

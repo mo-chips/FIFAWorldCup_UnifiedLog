@@ -504,6 +504,38 @@ function calculateWildcardAssignments(thirdPlaceTeams) {
   wildcardAssignments = fallbackAssignment;
 }
 
+function getMatchWinnerAndLoser(match) {
+  if (!match || !match.score) return null;
+  const score = match.score;
+  const t1 = resolveTeamName(match.team1);
+  const t2 = resolveTeamName(match.team2);
+  
+  if (!t1 || !t2) return null;
+  
+  // 1. Penalties (shootout)
+  if (score.p) {
+    const [p1, p2] = score.p;
+    if (p1 > p2) return { winner: t1, loser: t2 };
+    if (p2 > p1) return { winner: t2, loser: t1 };
+  }
+  
+  // 2. Extra Time
+  if (score.et) {
+    const [et1, et2] = score.et;
+    if (et1 > et2) return { winner: t1, loser: t2 };
+    if (et2 > et1) return { winner: t2, loser: t1 };
+  }
+  
+  // 3. Full Time
+  if (score.ft) {
+    const [ft1, ft2] = score.ft;
+    if (ft1 > ft2) return { winner: t1, loser: t2 };
+    if (ft2 > ft1) return { winner: t2, loser: t1 };
+  }
+  
+  return null;
+}
+
 function resolveTeamName(name) {
   if (!name) return '';
   if (name.startsWith('3')) {
@@ -529,15 +561,10 @@ function resolveTeamName(name) {
     const matchNum = parseInt(wlMatch[2]);
     const targetMatch = matches[matchNum - 1]; // 1-indexed to 0-indexed
     
-    if (targetMatch && targetMatch.score && targetMatch.score.ft) {
-      const [s1, s2] = targetMatch.score.ft;
-      const t1 = resolveTeamName(targetMatch.team1);
-      const t2 = resolveTeamName(targetMatch.team2);
-      
-      if (s1 > s2) {
-        return type === 'W' ? t1 : t2;
-      } else if (s2 > s1) {
-        return type === 'W' ? t2 : t1;
+    if (targetMatch) {
+      const outcome = getMatchWinnerAndLoser(targetMatch);
+      if (outcome) {
+        return type === 'W' ? outcome.winner : outcome.loser;
       }
     }
     return type === 'W' ? `Winner Match ${matchNum}` : `Loser Match ${matchNum}`;
@@ -677,7 +704,7 @@ function processOpenFootballData(openMatches) {
       time: m.time,
       team1: normalizeTeamName(m.team1),
       team2: normalizeTeamName(m.team2),
-      score: m.score && m.score.ft ? { ft: m.score.ft } : null,
+      score: m.score ? { ft: m.score.ft, et: m.score.et, p: m.score.p } : null,
       group: m.group,
       ground: m.ground,
       goals1: m.goals1 || [],
@@ -925,6 +952,20 @@ function computeStandingsFromStats(teamStats) {
         } else {
           team.status = 'eliminated';
         }
+      }
+    }
+  });
+  
+  // 3.5. Update statuses for teams knocked out in knockout stages
+  matches.forEach(match => {
+    const isKnockout = match.round && !match.round.toLowerCase().includes('matchday');
+    if (!isKnockout) return;
+    
+    const outcome = getMatchWinnerAndLoser(match);
+    if (outcome && outcome.loser) {
+      const loserTeam = teamStats[outcome.loser];
+      if (loserTeam) {
+        loserTeam.status = 'eliminated';
       }
     }
   });
@@ -1242,12 +1283,23 @@ function createBracketMatchCard(m) {
   let winnerClass1 = '';
   let winnerClass2 = '';
   
-  if (m.score && m.score.ft) {
-    const [s1, s2] = m.score.ft;
-    score1 = s1;
-    score2 = s2;
-    if (s1 > s2) winnerClass1 = 'winner';
-    if (s2 > s1) winnerClass2 = 'winner';
+  if (m.score) {
+    if (m.score.p) {
+      score1 = `${m.score.ft[0]} (${m.score.p[0]})`;
+      score2 = `${m.score.ft[1]} (${m.score.p[1]})`;
+    } else if (m.score.et) {
+      score1 = `${m.score.et[0]} (aet)`;
+      score2 = `${m.score.et[1]} (aet)`;
+    } else if (m.score.ft) {
+      score1 = m.score.ft[0];
+      score2 = m.score.ft[1];
+    }
+    
+    const outcome = getMatchWinnerAndLoser(m);
+    if (outcome) {
+      if (outcome.winner === displayTeam1) winnerClass1 = 'winner';
+      if (outcome.winner === displayTeam2) winnerClass2 = 'winner';
+    }
   }
   
   const matchNum = m.index + 1;
